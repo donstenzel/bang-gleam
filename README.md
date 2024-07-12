@@ -1,16 +1,41 @@
-# bang
+# ⚡ bang!
 
-[![Package Version](https://img.shields.io/hexpm/v/bang)](https://hex.pm/packages/bang)
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/bang/)
-
+### In your terminal:
 ```sh
-gleam add bang@1
+# add bang to your project with:
+gleam add bang
 ```
+
+### In gleam:
 ```gleam
+// then import it
 import bang
 
 pub fn main() {
-  // TODO: An example of the project in use
+  // finally, use the parse function:
+  //    1. string -> [token]
+  //    2. [token] -> AST
+  //    3. AST -> Output / Bytecode? Binary? Transpilation?
+  let tokens = parse("fun add(a, b) { return a + b }")
+  // -> [Function,
+  //     Ident("add"),
+  //     Leftparen,
+  //     Ident("a"),
+  //     Comma,
+  //     Whitespace("\\s"),
+  //     Ident("b"),
+  //     Rightparen,
+  //     Whitespace("\\s"),
+  //     Leftbrace,
+  //     Whitespace("\\s"),
+  //     Return,
+  //     Ident("a"),
+  //     Whitespace("\\s"),
+  //     Plus,
+  //     Whitespace("\\s"),
+  //     Ident("b"),
+  //     Whitespace("\\s"),
+  //     Rightbrace]
 }
 ```
 

@@ -3,16 +3,35 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/string
+import gleam/order
 import simplifile
 import argv
 
 pub fn main() {
+  let res = State([], string.to_graphemes("2776234"), 0)
+    |> { eat_if(matches: fn(chr) { string.contains("0123456789", chr) }, fatal: False)
+      |> cont1()
+      |> manipulate(fn(chrs) { chrs |> collapse() |> safe_parse() |> Number }) } 
+  
+  io.debug(res)
+
+  //startup()
+  }
+
+fn safe_parse(str) -> Int {
+  case int.parse(str) {
+    Ok(num) -> num
+    Error(_) -> panic as "Input has to be pre-validated."
+  }
+}
+
+fn startup() {
   case argv.load().arguments {
     [] -> start_repl()
     [path] ->
       case simplifile.read(path) {
-        Ok(source) -> source |> parse |> repr_tokens |> io.println
-        Error(e) -> { "Could not read file:\n" <> simplifile.describe_error(e) } |> io.println
+        Ok(source) -> source |> parse() |> repr_tokens() |> io.println()
+        Error(e) -> { "Could not read file: " <> path <> "\n" <> simplifile.describe_error(e) } |> io.println()
       }
     _ -> io.println("Usage:\n - './bang' -> repl\n - './bang <path>' -> file")
   }
@@ -25,7 +44,7 @@ fn start_repl() {
 
 fn repl() {
   case input("|> ") {
-    Ok(str) -> str |> parse |> repr_tokens |> io.println
+    Ok(str) -> str |> parse() |> repr_tokens() |> io.println()
     Error(_) -> io.println("Couldn't get line.")
   }
   repl()
@@ -74,6 +93,161 @@ pub fn eat(
   }
 }
 
+
+
+/// d -> digested item
+/// f -> food item
+/// r -> collapsed type
+pub type State(d, f, r) {
+  State(eaten: List(d), to_taste: List(f), tally: Int)
+  Collapsed(res: r, to_taste: List(f), tally: Int)
+}
+
+pub type Transition(d, f, r) {
+  Success(new: State(d, f, r))
+  Failure(offender: State(d, f, r), descs: List(String), fatal: Bool)
+}
+
+pub type Eat(d, f, r) = fn(State(d, f, r)) -> Transition(d, f, r)
+
+pub fn manipulate(e: Eat(d, f, r), func: fn(List(d)) -> r) -> Eat(d, f, r) {
+  fn(state: State(d, f, r)) -> Transition(d, f, r) {
+    case e(state) {
+      Success(state) -> {
+        let assert State(eaten, to_taste, tally) = state
+        Success(Collapsed(func(eaten), to_taste, tally))
+      }
+      Failure(_, _, _) as f -> f
+    }
+  }
+}
+
+pub fn seq(e1: Eat(d, f, r), e2: Eat(d, f, r)) -> Eat(d, f, r) {
+  fn(state: State(d, f, r)) -> Transition(d, f, r) {
+    case e1(state) {
+      Success(state) -> 
+        case e2(state) {
+          Success(_) as s -> s
+          Failure(_, _, _) as f -> f
+        }
+      Failure(_, _, _) as f -> f
+    }
+  }
+}
+
+// 0 or 1
+pub fn opt(e: Eat(d, f, r)) -> Eat(d, f, r) {
+  fn(state: State(d, f, r)) {
+    case e(state) {
+      Success(_) as s -> s
+      Failure(_, _, _) -> Success(state)
+    }
+  }
+}
+
+// 0 or more
+pub fn cont0(e: Eat(d, f, r)) -> Eat(d, f, r) {
+  cont0_inner(_, e)
+}
+
+pub fn cont0_inner(state: State(d, f, r), e: Eat(d, f, r)) -> Transition(d, f, r) {
+  case e(state) {
+    Success(state) -> 
+      case cont1_inner(state, e) {
+        Success(_) as s -> s
+        Failure(_, _, _) -> Success(state)
+      }
+    Failure(_, _, _) -> Success(state)
+  }
+}
+
+// 1 or more
+pub fn cont1(e: Eat(d, f, r)) -> Eat(d, f, r) {
+  cont1_inner(_, e)
+}
+
+pub fn cont1_inner(state: State(d, f, r), e: Eat(d, f, r)) -> Transition(d, f, r) {
+  case e(state) {
+    Success(state) -> 
+      case cont1_inner(state, e) {
+        Success(_) as s -> s
+        Failure(_, _, _) -> Success(state)
+      }
+    Failure(_, _, _) as f -> f
+  }
+}
+
+pub fn combine_failure(f1: Transition(d, f, r), f2: Transition(d, f, r)) -> Transition(d, f, r) {
+  let assert Failure(State(eaten1, to_taste1, tally1), descs1, fatal1) = f1
+  let assert Failure(State(eaten2, to_taste2, tally2), descs2, fatal2) = f2
+  case int.compare(tally1, tally2) {
+    order.Lt -> Failure(State(eaten2, to_taste2, tally2), list.append(descs1, descs2), fatal1 || fatal2)
+    order.Gt |
+    order.Eq -> Failure(State(eaten1, to_taste1, tally1), list.append(descs1, descs2), fatal1 || fatal2)
+  }
+}
+
+pub fn or(e1: Eat(d, f, r), e2: Eat(d, f, r)) -> Eat(d, f, r) { 
+  fn(state: State(d, f, r)) -> Transition(d, f, r) {
+    case e1(state) {
+      Success(_) as s1 -> s1
+      Failure(_, _, fatal) as f1 -> case fatal {
+        True -> f1
+        False -> {
+          case e2(state) {
+            Success(_) as s2 -> s2
+            Failure(_, _, _) as f2 -> combine_failure(f1, f2)
+          }
+        }
+      }
+    }
+  }
+}
+
+
+pub fn eat_if(matches predicate: fn(String) -> Bool, fatal fatal: Bool) -> Eat(String, String, r) {
+  fn(state: State(String, String, r)) -> Transition(String, String, r) {
+    // base cases: no input left, next char doesnt match
+    let assert State(eaten, to_taste, tally) = state
+
+    case to_taste {
+      [head, ..tail] ->
+        case predicate(head) {
+          True -> Success(State([head, ..eaten], tail, tally +1))
+          False -> Failure(state, [head <> "did not match expected."], fatal)
+        }
+      [] -> Failure(state, ["No input left to eat @" <> tally |> int.to_string()], fatal)
+    }
+  }
+}
+
+pub fn eat_char(char: String, fatal: Bool) -> Eat(String, String, String) {
+  eat_if(matches: fn(c) { c == char }, fatal: fatal)
+}
+
+pub fn eat_string(str: String, fatal: Bool) -> Eat(String, String, String) {
+  case string.to_graphemes(str) {
+    [head, ..tail] -> {
+      let eat_head = eat_char(head, fatal)
+      list.fold(from: eat_head, over: tail, with: fn(first, next_char) {
+        seq(first, eat_char(next_char, fatal))
+      } )
+    }
+    [] -> panic as "You can not eat an empty string!"
+  }
+}
+
+
+pub fn parse_test(str: String) {
+    case str {
+    "" -> [END]
+
+    "("         <> rest -> [Leftparen,     ..parse_test(rest)]
+    ")"         <> rest -> [Rightparen,    ..parse_test(rest)]
+    _ -> []
+    }
+}
+
 pub fn parse(str: String) -> List(Token) {
   
   let eat_number = eat(_, fn(chr) { string.contains("01234679", chr) })
@@ -101,7 +275,7 @@ pub fn parse(str: String) -> List(Token) {
       Ok(#(grapheme, rest)) ->
         case grapheme {
           "'" -> #(parsed, rest)
-          _ -> panic
+          _ -> panic as "Can not happen."
         }
       Error(_) -> panic
     }
