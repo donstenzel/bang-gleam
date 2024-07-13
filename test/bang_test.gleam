@@ -1,4 +1,4 @@
-import gleam/string
+import gleam/list
 import gleeunit
 import gleeunit/should
 import bang
@@ -29,23 +29,34 @@ pub fn comment_test() {
     |> should.equal([bang.Comment(" This is a comment, ending on a newline."), bang.Whitespace("\\n"), bang.END])
 }
 
+pub fn e_if_test() {
+  let a = bang.e_if(fn(chr) { chr == "A" }, False)
+  "A" |> bang.init_state()
+      |> a()
+      |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
+
+  "B" |> bang.init_state()
+      |> a()
+      |> should.equal(bang.EFailure(bang.EState(["B"], 0), ["B did not match expected."], False))
+}
+
 // Combinators:
 
 pub fn or_test() {
-  let a = bang.eat_if(fn(chr) { chr == "A" }, False)
-  let b = bang.eat_if(fn(chr) { chr == "B" }, False)
+  let a = bang.e_if(fn(chr) { chr == "A" }, False)
+  let b = bang.e_if(fn(chr) { chr == "B" }, False)
 
-  let a_or_b = bang.or(a, b)
+  let a_or_b = bang.e_or(a, b, list.append)
 
-  "A" |>bang.new_state()
+  "A" |> bang.init_state()
       |> a_or_b()
-      |> should.equal(bang.Success(bang.State(["A"], [], 1)))
+      |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
 
-  "B" |>bang.new_state()
+  "B" |> bang.init_state()
       |> a_or_b()
-      |> should.equal(bang.Success(bang.State(["B"], [], 1)))
+      |> should.equal(bang.ESuccess(bang.EState([], 1), "B"))
 
-  "C" |>bang.new_state()
+  "C" |> bang.init_state()
       |> a_or_b()
-      |> should.equal(bang.Failure(bang.State([], ["C"], 0), ["C did not match expected.", "C did not match expected."], False))
+      |> should.equal(bang.EFailure(bang.EState(["C"], 0), ["C did not match expected.", "C did not match expected."], False))
 }

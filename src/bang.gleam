@@ -1,4 +1,4 @@
-import gleam/erlang.{ get_line as input }       
+import gleam/erlang.{ get_line as input }
 import gleam/int
 import gleam/io
 import gleam/list
@@ -8,28 +8,43 @@ import simplifile
 import argv
 
 pub fn main() {
-  let p = eat_if(matches: fn(chr) { string.contains("0123456789", chr) }, fatal: False)
-            |> cont1()
-            |> manipulate(fn(chrs) { chrs |> collapse() |> safe_parse() |> Number })
-            |> cont0()
 
-  let res = "123abc123  "
-              |> new_state()
-              |> p()
+  let lparen = e_if(fn(chr) { chr == "(" }, False)
+                 |> e_map(fn(_) { Leftparen })
+                 
+  let rparen = e_if(fn(chr) { chr == ")" }, False)
+                 |> e_map(fn(_) { Rightparen })
+
+  let parens = e_or(lparen, rparen, list.append)
+
+  let p = e_if(fn(chr) { string.contains("0123456789", chr) }, False)
+            |> e_cont1()
+            |> e_map(fn(chrs) { chrs |> collapse_lr() |> safe_parse() |> Number })
+            |> e_or(parens, list.append)
+            |> e_cont0()
+
+  let res = "(())()"
+              |> init_state()
+              |> { parens |> e_cont0() }
   
   io.debug(res)
 
+  let res = "(100)(666)"
+              |> init_state()
+              |> p
+
+  io.debug(res)
   //startup()
   }
 
-fn safe_parse(str) -> Int {
+pub fn safe_parse(str) -> Int {
   case int.parse(str) {
     Ok(num) -> num
     Error(_) -> panic as "Input has to be pre-validated."
   }
 }
 
-fn startup() {
+pub fn startup() {
   case argv.load().arguments {
     [] -> start_repl()
     [path] ->
@@ -41,12 +56,12 @@ fn startup() {
   }
 }
 
-fn start_repl() {
+pub fn start_repl() {
   io.print("Welcome to the bang! interactive environment. for now only tokenizes your input\n\n")
   repl()
 }
 
-fn repl() {
+pub fn repl() {
   case input("|> ") {
     Ok(str) -> str |> parse() |> repr_tokens() |> io.println()
     Error(_) -> io.println("Couldn't get line.")
@@ -55,7 +70,14 @@ fn repl() {
 }
 
 
-pub fn collapse(str: List(String)) -> String {
+pub fn collapse_lr(str: List(String)) -> String {
+  case list.reduce(str, fn(s1, s2) { s1 <> s2 }) {
+    Ok(str) -> str
+    Error(_) -> ""
+  }
+}
+
+pub fn collapse_rl(str: List(String)) -> String {
   case list.reduce(str, fn(s1, s2) { s2 <> s1 }) {
     Ok(str) -> str
     Error(_) -> ""
@@ -348,22 +370,22 @@ pub fn parse(str: String) -> List(Token) {
       case grapheme {
         "#" -> {
           let #(parsed, rest) = eat_comment(#([], str))
-          [parsed |> collapse() |> Comment, ..parse(rest)]
+          [parsed |> collapse_rl() |> Comment, ..parse(rest)]
         }
 
         " " | "\t" | "\n" -> {
           let #(parsed, rest) = eat_whitespace(#([], str))
-          [parsed |> collapse() |> escape() |> Whitespace, ..parse(rest)]
+          [parsed |> collapse_rl() |> escape() |> Whitespace, ..parse(rest)]
         }
 
         "'" -> {
           let #(parsed, rest) = eat_string(#([], str))
-          [parsed |> collapse() |> String, ..parse(rest)]
+          [parsed |> collapse_rl() |> String, ..parse(rest)]
         }
 
         "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> {
           let #(parsed, rest) = eat_number(#([], str))
-          let assert Ok(num) = parsed |> collapse() |> int.parse()
+          let assert Ok(num) = parsed |> collapse_rl() |> int.parse()
           [num |> Number, ..parse(rest)]
         }
 
@@ -374,7 +396,7 @@ pub fn parse(str: String) -> List(Token) {
         "u" | "U" | "v" | "U" | "w" | "W" | "x" | "X" | "y" | "Y" |
         "z" | "Z" | "_" -> {
           let #(parsed, rest) = eat_ident(#([], str))
-          [parsed |> collapse() |> Identifier, ..parse(rest)]
+          [parsed |> collapse_rl() |> Identifier, ..parse(rest)]
         }
 
         _ -> panic as "Unknown character."
@@ -509,35 +531,39 @@ pub type Token {
 
 
 
-type EState {
+pub type EState {
   EState(rest: List(String), tally: Int)
 }
 
-type EResult(s, e) {
-  ESuccess(new: EState, eaten: s)
-  EFailure(old: EState, error: e)
+pub fn init_state(str) {
+  EState(string.to_graphemes(str), 0)
 }
 
-type EFunction(r, e) = fn(EState) -> EResult(r, e)
+pub type EResult(s, e) {
+  ESuccess(new: EState, eaten: s)
+  EFailure(old: EState, error: e, fatal: Bool)
+}
 
-fn e_seq(
+pub type EFunction(r, e) = fn(EState) -> EResult(r, e)
+
+pub fn e_seq(
   e1: EFunction(s, e),
   e2: EFunction(s, e),
   combine_eaten: fn(s, s) -> s_new
 ) -> EFunction(s_new, e) {
   fn(state: EState) -> EResult(s_new, e) {
     case e1(state) {
-      EFailure(state, error) -> EFailure(state, error)
+      EFailure(state, error, fatal) -> EFailure(state, error, fatal)
       ESuccess(new, eaten1) -> 
         case e2(new) {
-          EFailure(state, error) -> EFailure(state, error)
+          EFailure(state, error, fatal) -> EFailure(state, error, fatal)
           ESuccess(new, eaten2) -> ESuccess(new, combine_eaten(eaten1, eaten2))
         }
     }
   }
 }
 
-fn e_or(
+pub fn e_or(
   e1: EFunction(s, e),
   e2: EFunction(s, e),
   combine_errors: fn(e, e) -> e
@@ -553,41 +579,91 @@ fn e_or(
           order.Eq -> s1
         }
       }
-      EFailure(_, _), ESuccess(_, _) as s | ESuccess(_, _) as s, EFailure(_, _) -> s
-      EFailure(old1, e1) as f1, EFailure(old2, e2) as f2 -> {
+      EFailure(_, _, _), ESuccess(_, _) as s |
+      ESuccess(_, _) as s, EFailure(_, _, _) -> s
+      EFailure(old1, error1, fatal1) as f1, EFailure(old2, error2, fatal2) as f2 -> {
         let EState(_, tally1) = old1
         let EState(_, tally2) = old2
         case int.compare(tally1, tally2) {
           order.Lt -> f2
           order.Gt -> f1
-          order.Eq -> EFailure(old1, combine_errors(e1, e2))
+          order.Eq -> EFailure(
+            old1,
+            combine_errors(error1, error2),
+            fatal1 || fatal2
+          )
         }
       }
-
     }
   }
 }
 
-fn e_opt(
+pub fn e_opt(
   e: EFunction(s, e),
   zero: s // the zero element under this operation over s.
 ) -> EFunction(s, e) {
   fn(state: EState) -> EResult(s, e) {
     case e(state) {
-      EFailure(_, _) -> ESuccess(state, zero)
+      EFailure(_, _, _) -> ESuccess(state, zero)
       ESuccess(_, _) as s -> s
     }
   }
 }
 
-fn e_map(
+pub fn e_cont0(e: EFunction(s, e)) -> EFunction(List(s), e) {
+  e_cont0_rec(e, _)
+}
+
+pub fn e_cont0_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
+  case e(state) {
+    ESuccess(new, eaten) ->
+      case e_cont1_rec(e, new) {
+        ESuccess(newer, eaten_tail) -> ESuccess(newer, [eaten, ..eaten_tail])
+        EFailure(_, _, _) -> ESuccess(new, [eaten])
+      }
+    EFailure(_, _, _) -> ESuccess(state, [])
+  }
+}
+
+pub fn e_cont1(e: EFunction(s, e)) -> EFunction(List(s), e) {
+  e_cont1_rec(e, _)
+}
+
+pub fn e_cont1_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
+  case e(state) {
+    ESuccess(new, eaten) ->
+      case e_cont1_rec(e, new) {
+        ESuccess(newer, eaten_tail) -> ESuccess(newer, [eaten, ..eaten_tail])
+        EFailure(_, _, _) -> ESuccess(new, [eaten])
+      }
+    EFailure(old, error, fatal) -> EFailure(old, error, fatal)
+  }
+}
+
+
+pub fn e_map(
   e: EFunction(s, e),
   f: fn(s) -> s_new
 ) -> EFunction(s_new, e) {
   fn(state: EState) -> EResult(s_new, e) {
     case e(state) {
-      EFailure(state, error) -> EFailure(state, error)
+      EFailure(state, error, fatal) -> EFailure(state, error, fatal)
       ESuccess(new, eaten) -> ESuccess(new, f(eaten))
+    }
+  }
+}
+
+pub fn e_if(predicate: fn(String) -> Bool, fatal: Bool) -> EFunction(String, List(String)) {
+  fn(state: EState) -> EResult(String, List(String)) {
+    let EState(rest, tally) = state
+
+    case rest {
+      [head, ..tail] ->
+        case predicate(head) {
+          True -> ESuccess(EState(tail, tally +1), head)
+          False -> EFailure(state, [head <> " did not match expected."], fatal)
+        }
+      [] -> EFailure(EState([], tally), ["No input left to match."], True)
     }
   }
 }
