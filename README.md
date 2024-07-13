@@ -1,8 +1,14 @@
 # ⚡ bang!
 
+bang language in gleam.
+contains parzerker-gleam for the lexing & parsing
+will contain not yet named type system (probably structural types, HM?)
+
+each component should exist in multiple languages, like parzerker-python and bang-python.
+
 ### In your terminal:
 ```sh
-# add bang to your project with:
+# in the future you might be able to add bang to your project with:
 gleam add bang
 ```
 
@@ -12,30 +18,7 @@ gleam add bang
 import bang
 
 pub fn main() {
-  // finally, use the parse function:
-  //    1. string -> [token]
-  //    2. [token] -> AST
-  //    3. AST -> Output / Bytecode? Binary? Transpilation?
-  let tokens = parse("fun add(a, b) { return a + b }")
-  // -> [Function,
-  //     Ident("add"),
-  //     Leftparen,
-  //     Ident("a"),
-  //     Comma,
-  //     Whitespace("\\s"),
-  //     Ident("b"),
-  //     Rightparen,
-  //     Whitespace("\\s"),
-  //     Leftbrace,
-  //     Whitespace("\\s"),
-  //     Return,
-  //     Ident("a"),
-  //     Whitespace("\\s"),
-  //     Plus,
-  //     Whitespace("\\s"),
-  //     Ident("b"),
-  //     Whitespace("\\s"),
-  //     Rightbrace]
+  <to be added...>
 }
 ```
 

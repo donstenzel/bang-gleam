@@ -7,30 +7,8 @@ pub fn main() {
   gleeunit.main()
 }
 
-pub fn whitespace_test() {
-  " " |> bang.parse()
-      |> should.equal([bang.Whitespace(" "), bang.END])
-}
-
-pub fn string_test() {
-  "'This is a String, containing anything but single quotes'"
-    |> bang.parse()
-    |> should.equal([bang.String("This is a String, containing anything but single quotes"), bang.END])
-}
-
-pub fn integer_test() {
-  "100000" |> bang.parse()
-           |> should.equal([bang.Number(100000), bang.END])
-}
-
-pub fn comment_test() {
-  "# This is a comment, ending on a newline.\n"
-    |> bang.parse()
-    |> should.equal([bang.Comment(" This is a comment, ending on a newline."), bang.Whitespace("\\n"), bang.END])
-}
-
 pub fn e_if_test() {
-  let a = bang.e_if(fn(chr) { chr == "A" }, False)
+  let a = bang.e_if(fn(chr) { chr == "A" }, False, "'A'")
   "A" |> bang.init_state()
       |> a()
       |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
@@ -74,8 +52,8 @@ pub fn e_string_test() {
 // Combinators:
 
 pub fn e_or_test() {
-  let a = bang.e_if(fn(chr) { chr == "A" }, False)
-  let b = bang.e_if(fn(chr) { chr == "B" }, False)
+  let a = bang.e_char("A", False)
+  let b = bang.e_char("B", False)
 
   let a_or_b = bang.e_or(a, b, list.append)
 
