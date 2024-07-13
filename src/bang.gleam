@@ -8,10 +8,14 @@ import simplifile
 import argv
 
 pub fn main() {
-  let res = State([], string.to_graphemes("2776234"), 0)
-    |> { eat_if(matches: fn(chr) { string.contains("0123456789", chr) }, fatal: False)
-      |> cont1()
-      |> manipulate(fn(chrs) { chrs |> collapse() |> safe_parse() |> Number }) } 
+  let p = eat_if(matches: fn(chr) { string.contains("0123456789", chr) }, fatal: False)
+            |> cont1()
+            |> manipulate(fn(chrs) { chrs |> collapse() |> safe_parse() |> Number })
+            |> cont0()
+
+  let res = "123abc123  "
+              |> new_state()
+              |> p()
   
   io.debug(res)
 
@@ -101,6 +105,10 @@ pub fn eat(
 pub type State(d, f, r) {
   State(eaten: List(d), to_taste: List(f), tally: Int)
   Collapsed(res: r, to_taste: List(f), tally: Int)
+}
+
+pub fn new_state(str) {
+  State([], string.to_graphemes(str), 0)
 }
 
 pub type Transition(d, f, r) {
@@ -205,8 +213,8 @@ pub fn or(e1: Eat(d, f, r), e2: Eat(d, f, r)) -> Eat(d, f, r) {
 }
 
 
-pub fn eat_if(matches predicate: fn(String) -> Bool, fatal fatal: Bool) -> Eat(String, String, r) {
-  fn(state: State(String, String, r)) -> Transition(String, String, r) {
+pub fn eat_if(matches predicate: fn(f) -> Bool, fatal fatal: Bool) -> Eat(f, f, r) {
+  fn(state: State(f, f, r)) -> Transition(f, f, r) {
     // base cases: no input left, next char doesnt match
     let assert State(eaten, to_taste, tally) = state
 
@@ -214,7 +222,7 @@ pub fn eat_if(matches predicate: fn(String) -> Bool, fatal fatal: Bool) -> Eat(S
       [head, ..tail] ->
         case predicate(head) {
           True -> Success(State([head, ..eaten], tail, tally +1))
-          False -> Failure(state, [head <> "did not match expected."], fatal)
+          False -> Failure(state, ["Input did not match expected."], fatal)
         }
       [] -> Failure(state, ["No input left to eat @" <> tally |> int.to_string()], fatal)
     }
@@ -497,4 +505,89 @@ pub type Token {
   Comment(String)
   Identifier(String)
   Whitespace(String)
+}
+
+
+
+type EState {
+  EState(rest: List(String), tally: Int)
+}
+
+type EResult(s, e) {
+  ESuccess(new: EState, eaten: s)
+  EFailure(old: EState, error: e)
+}
+
+type EFunction(r, e) = fn(EState) -> EResult(r, e)
+
+fn e_seq(
+  e1: EFunction(s, e),
+  e2: EFunction(s, e),
+  combine_eaten: fn(s, s) -> s_new
+) -> EFunction(s_new, e) {
+  fn(state: EState) -> EResult(s_new, e) {
+    case e1(state) {
+      EFailure(state, error) -> EFailure(state, error)
+      ESuccess(new, eaten1) -> 
+        case e2(new) {
+          EFailure(state, error) -> EFailure(state, error)
+          ESuccess(new, eaten2) -> ESuccess(new, combine_eaten(eaten1, eaten2))
+        }
+    }
+  }
+}
+
+fn e_or(
+  e1: EFunction(s, e),
+  e2: EFunction(s, e),
+  combine_errors: fn(e, e) -> e
+) -> EFunction(s, e) {
+  fn(state: EState) -> EResult(s, e) {
+    case e1(state), e2(state) {
+      ESuccess(new1, _)as s1, ESuccess(new2, _) as s2 -> {
+        let EState(_, tally1) = new1
+        let EState(_, tally2) = new2
+        case int.compare(tally1, tally2) {
+          order.Lt -> s2
+          order.Gt | // <- maybe return error because of ambiguous match
+          order.Eq -> s1
+        }
+      }
+      EFailure(_, _), ESuccess(_, _) as s | ESuccess(_, _) as s, EFailure(_, _) -> s
+      EFailure(old1, e1) as f1, EFailure(old2, e2) as f2 -> {
+        let EState(_, tally1) = old1
+        let EState(_, tally2) = old2
+        case int.compare(tally1, tally2) {
+          order.Lt -> f2
+          order.Gt -> f1
+          order.Eq -> EFailure(old1, combine_errors(e1, e2))
+        }
+      }
+
+    }
+  }
+}
+
+fn e_opt(
+  e: EFunction(s, e),
+  zero: s // the zero element under this operation over s.
+) -> EFunction(s, e) {
+  fn(state: EState) -> EResult(s, e) {
+    case e(state) {
+      EFailure(_, _) -> ESuccess(state, zero)
+      ESuccess(_, _) as s -> s
+    }
+  }
+}
+
+fn e_map(
+  e: EFunction(s, e),
+  f: fn(s) -> s_new
+) -> EFunction(s_new, e) {
+  fn(state: EState) -> EResult(s_new, e) {
+    case e(state) {
+      EFailure(state, error) -> EFailure(state, error)
+      ESuccess(new, eaten) -> ESuccess(new, f(eaten))
+    }
+  }
 }
