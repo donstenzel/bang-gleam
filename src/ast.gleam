@@ -13,20 +13,22 @@ pub type Operator {
 }
 
 pub type Literal {
-    String(String)
-    Number(Int)
-    Boolean(Bool)
-    Reference(String)
-    Expression(Expression)
+  String(String)
+  Number(Int)
+  Boolean(Bool)
+  Reference(String)
+  ParenExpression(Expression)
 }
 
 pub type Primitive {
-
+  Numeric
+  Text
+  Bool
 }
 
 pub type Type {
-  Sum(List(Type))
-  Product(List(Type))
+  Sum(Type, Type)
+  Product(Type, Type)
   Just(Primitive)
 }
 
@@ -37,22 +39,26 @@ pub type Expression {
   Prefix(op: Operator, subject: Expression)
   Suffix(subject: Expression, op: Operator)
   Call(subject: Expression, args: List(Expression))
-  Function(args: List(Argument), body: Block)
+  AnonFunction(args: List(Argument), body: Block)
   Literal(Literal)
   MemberAccess(subject: Literal, member: String)
 }
 
 pub type Statement {
-    Block(Block)
-    ExpressionStmt(Expression)
-    Return(option.Option(Expression))
-    If(cond: Expression, body: Statement, else_block: option.Option(Statement))
-    While(cond: Expression, body: Statement, else_block: option.Option(Statement))
-    Assignment(variable: Declaration, value: Expression)
+  Block(Block)
+  Expression(Expression)
+  Return(option.Option(Expression))
+  If(cond: Expression, body: Statement, else_block: option.Option(Statement))
+  While(cond: Expression, body: Statement, else_block: option.Option(Statement))
+  Assignment(variable: Declaration, value: Expression)
 }
 
 pub type Declaration {
-    
+  Statement(Statement)
+  Value(name: String, value: Expression)
+  Variable(name: String, value: option.Option(Expression))
+  Type(name: String, definition: Expression)
+  Function(name: String, args: List(Argument), body: Block)
 }
 
 pub type Block = List(Declaration)
