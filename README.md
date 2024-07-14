@@ -22,7 +22,6 @@ pub fn main() {
 }
 ```
 
-Further documentation can be found at <https://hexdocs.pm/bang>.
 
 ## Development
 

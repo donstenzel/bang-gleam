@@ -57,7 +57,7 @@ pub fn e_string_test() {
           fn(r) {
             r |> bang.is_error()
               |> should.be_true()
-          } )
+          })
 }
 // Combinators:
 
