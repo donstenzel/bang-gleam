@@ -99,10 +99,10 @@ pub fn escape(str: String) {
 
 pub fn escape_chr(chr: String) -> String {
   case chr {
-    " " -> " "
-    "\n" -> "↵"
-    "\t" -> "🡲"
-    "\r" -> "🡰"
+    " " ->  " "
+    "\n" -> "↲"
+    "\t" -> "→"
+    "\r" -> "←"
     "\\" -> "\\"
     regular -> regular
   }
