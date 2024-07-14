@@ -23,8 +23,10 @@ pub fn safe_parse(str) -> Int {
   }
 }
 
-pub fn fork(val: v, f1: fn(v) -> a, f2: fn(v) -> b) -> #(a, b) {
-  #(f1(val), f2(val))
+pub fn fork(f1: fn(v) -> a, f2: fn(v) -> b) -> fn(v) -> #(a, b) {
+  fn(val: v) -> #(a, b) {
+    #(f1(val), f2(val))
+  }
 }
 
 pub fn startup() {
@@ -125,6 +127,29 @@ pub fn eat(
   }
 }
 
+const keywords = [
+  "var",
+  "val",
+  "fun",
+  "return",
+  "true",
+  "false",
+  "if",
+  "else",
+  "while",
+  "for",
+  "in",
+  "match",
+  "area",
+  "struct",
+  "enum",
+  "this",
+  "extend",
+  "extension",
+  "like"
+]
+
+
 pub fn repr_token(t: Token) -> String {
   case t {
     END             -> "End"
@@ -184,6 +209,8 @@ pub fn repr_token(t: Token) -> String {
     Whitespace(str) -> "Whitespace: '" <> str <> "'"
   }
 }
+
+
 
 pub fn repr_tokens(tokens: List(Token)) -> String {
   list.fold(from: "", over: tokens, with: fn(curr, next) {
@@ -251,7 +278,7 @@ pub type Token {
 
 
 pub fn parse(state) {
-    let e_lparen = e_const_token("(", False, Leftparen)
+  let e_lparen = e_const_token("(", False, Leftparen)
   let e_rparen = e_const_token(")", False, Rightparen)
   let e_lbrckt = e_const_token("[", False, Leftbracket)
   let e_rbrckt = e_const_token("]", False, Rightbracket)
@@ -329,67 +356,115 @@ pub fn parse(state) {
     })
   })
 
-  state
-  |> {
+  let e_quote = "'" |> e_char(False)
+  let e_strcntnt = e_if(fn(c) { c != "'" }, False, "not '")
+                   |> e_cont0()
+  let e_str = e_surr(e_quote, e_strcntnt, e_quote)
+              |> e_map(fn(chrs) {
+                chrs |> collapse_lr()
+                     |> String()
+              })
+
+  let e_number = e_if(
+    fn(chr) {
+      "0123456789" |> string.contains(chr)
+    },
+    False,
+    "numeric"
+  ) |> e_cont1()
+    |> e_map(fn(chrs) {
+      chrs |> collapse_lr()
+           |> safe_parse()
+           |> Number()
+    })
+
+  let e_ident = e_if(
+    fn(chr) {
+      "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      |> string.contains(chr)
+    },
+    False,
+    "alphabetic & _"
+  ) |> e_cont1()
+    |> e_map_if(
+      fn(chrs) {
+        let str = chrs |> collapse_lr()
+        ! list.contains(keywords, str)
+      },
+      "Identifier cannot be a keyword."
+    )
+    |> e_map(
+      fn(chrs) {
+        chrs |> collapse_lr()
+             |> Identifier()
+      })
+
+  let es = [
+    e_ident,
+    e_number,
+    e_str,
+    e_whtspc,
+    e_cmmnt,
+    e_like,
+    e_xtnsn,
+    e_xtend,
+    e_this,
+    e_enum,
+    e_struct,
+    e_lparen,
+    e_rparen,
+    e_lbrckt,
+    e_rbrckt,
+    e_lbrace,
+    e_rbrace,
+    e_plus,
+    e_minus,
+    e_star,
+    e_slash,
+    e_prcnt,
+    e_and,
+    e_ort,
+    e_less,
+    e_great,
+    e_equals,
+    e_bang,
+    e_dot,
+    e_qstmrk,
+    e_comma,
+    e_colon,
+    e_tilde,
+    e_dequal,
+    e_lteq,
+    e_gteq,
+    e_nequal,
+    e_lshift,
+    e_rshift,
+    e_pipe,
+    e_bind,
+    e_var,
+    e_val,
+    e_fun,
+    e_ret,
+    e_true,
+    e_false,
+    e_ift,
+    e_else,
+    e_while,
+    e_for,
+    e_in,
+    e_match,
+    e_area,
+  ]
+
+  state |> {
     case list.reduce(
-      over: [
-        e_whtspc,
-        e_cmmnt,
-        e_like,
-        e_xtnsn,
-        e_xtend,
-        e_this,
-        e_enum,
-        e_struct,
-        e_lparen,
-        e_rparen,
-        e_lbrckt,
-        e_rbrckt,
-        e_lbrace,
-        e_rbrace,
-        e_plus,
-        e_minus,
-        e_star,
-        e_slash,
-        e_prcnt,
-        e_and,
-        e_ort,
-        e_less,
-        e_great,
-        e_equals,
-        e_bang,
-        e_dot,
-        e_qstmrk,
-        e_comma,
-        e_colon,
-        e_tilde,
-        e_dequal,
-        e_lteq,
-        e_gteq,
-        e_nequal,
-        e_lshift,
-        e_rshift,
-        e_pipe,
-        e_bind,
-        e_var,
-        e_val,
-        e_fun,
-        e_ret,
-        e_true,
-        e_false,
-        e_ift,
-        e_else,
-        e_while,
-        e_for,
-        e_in,
-        e_match,
-        e_area,
-      ],
+      over: es,
       with: fn(l, r) { e_or(l, r, list.append) }
     ) {
       Ok(p) -> p
       Error(_) -> panic as "this should work!"
-    } |> e_cont1() }
+    } |> e_until(e_end())
+  }
 }
 
 
@@ -458,6 +533,14 @@ pub fn e_seq_r(
   e2: EFunction(s, e)
 ) -> EFunction(s, e) {
   e_seq(e1, e2, fn(_, r) { r })
+}
+
+pub fn e_surr(
+  l: EFunction(_, e),
+  e: EFunction(s, e),
+  r: EFunction(_, e)
+) -> EFunction(s, e) {
+  e_seq_r(l, e_seq_l(e, r))
 }
 
 pub fn e_seq_many(
@@ -565,6 +648,23 @@ pub fn e_map(
   }
 }
 
+pub fn e_map_if(
+  e: EFunction(s, List(String)),
+  p: fn(s) -> Bool,
+  description: String
+) -> EFunction(s, List(String)) {
+  fn(state: EState) -> EResult(s, List(String)) {
+    case e(state) {
+      EFailure(_, _, _) as f -> f
+      ESuccess(_, eaten) as s ->
+        case p(eaten) {
+          True -> s
+          False -> EFailure(state, [description], False)
+        }
+    }
+  }
+}
+
 pub fn e_map_err(
   e: EFunction(s, e),
   f: fn(e) -> e_new
@@ -577,16 +677,39 @@ pub fn e_map_err(
   }
 }
 
-// pub fn e_end() {
-//   fn(state: EState) {
-//     let EState(rest, tally) = state
+pub fn e_end() {
+  fn(state: EState) {
+    let EState(rest, tally) = state
 
-//     case rest {
-//       [] -> ESuccess(EState([], tally +1), END)
-//       _ -> EFailure(state, ["Expected empty input."], False)
-//     }
-//   }
-// }
+    case rest {
+      [] -> ESuccess(EState([], tally), END)
+      _ -> EFailure(state, ["Expected empty input."], False)
+    }
+  }
+}
+
+pub fn e_until(e: EFunction(s, e), end: EFunction(s, e)) -> EFunction(List(s), e) {
+  e_until_inner(_, e, end)
+}
+
+pub fn e_until_inner(state: EState, e: EFunction(s, e), end: EFunction(s, e)) -> EResult(List(s), e) {
+  case end(state) {
+    EFailure(_, _, _) ->
+      case e(state) {
+        ESuccess(new, eaten) ->
+          case e_until_inner(new, e, end) {
+            ESuccess(newer, eaten_tail) -> {
+              ESuccess(newer, [eaten, ..eaten_tail])
+            }
+            EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
+          }
+        EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
+      }
+    ESuccess(newer, eaten2) -> ESuccess(newer, [eaten2])
+  }
+}
+
+
 
 pub fn e_if(
   predicate: fn(String) -> Bool,
