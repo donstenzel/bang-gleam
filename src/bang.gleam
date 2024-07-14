@@ -23,6 +23,10 @@ pub fn safe_parse(str) -> Int {
   }
 }
 
+pub fn fork(val: v, f1: fn(v) -> a, f2: fn(v) -> b) -> #(a, b) {
+  #(f1(val), f2(val))
+}
+
 pub fn startup() {
 
 
@@ -96,10 +100,10 @@ pub fn escape(str: String) {
 pub fn escape_chr(chr: String) -> String {
   case chr {
     " " -> " "
-    "\n" -> "\\n"
-    "\t" -> "\\t"
-    "\r" -> "\\r"
-    "\\" -> "\\\\"
+    "\n" -> "↵"
+    "\t" -> "🡲"
+    "\r" -> "🡰"
+    "\\" -> "\\"
     regular -> regular
   }
 }
@@ -297,10 +301,10 @@ pub fn parse(state) {
   let e_xtnsn = e_const_token("extension", False, Extension)
   let e_like = e_const_token("like", False, Like)
 
-  let e_cmmnt = e_seq(
+  let e_cmmnt = e_seq_r(
     e_char("#", False),
     e_if(fn(chr) { chr != "\n" }, False, "not new-line") |> e_cont0(),
-    fn(_, cntnt) { cntnt }
+    // fn(_, cntnt) { cntnt }
   ) |> e_map(fn(str) {
     str |> collapse_lr()
         |> Comment()
@@ -318,6 +322,11 @@ pub fn parse(state) {
     str |> collapse_lr()
         |> escape()
         |> Whitespace()
+  })
+  |> e_map_err(fn(errs) {
+    errs |> list.map(fn(err) {
+      err <> " (Whitespace)"
+    })
   })
 
   state
@@ -395,6 +404,27 @@ pub fn init_state(str) {
 pub type EResult(s, e) {
   ESuccess(new: EState, eaten: s)
   EFailure(old: EState, error: e, fatal: Bool)
+}
+
+pub fn is_success(r: EResult(_, _)) -> Bool {
+  case r {
+    ESuccess(_, _) -> True
+    EFailure(_, _, _) -> False
+  }
+}
+
+pub fn is_error(r: EResult(_, _)) -> Bool {
+  case r {
+    ESuccess(_, _) -> False
+    EFailure(_, _, _) -> True
+  }
+}
+
+pub fn is_tally(r: EResult(_, _), to_match) -> Bool {
+  case r {
+    ESuccess(EState(_, tally), _) -> tally == to_match
+    EFailure(EState(_, tally), _, _) -> tally == to_match
+  }
 }
 
 pub type EFunction(r, e) = fn(EState) -> EResult(r, e)
@@ -503,11 +533,7 @@ pub fn e_cont0_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
         ESuccess(newer, eaten_tail) -> ESuccess(newer, [eaten, ..eaten_tail])
         EFailure(_, _, _) -> ESuccess(new, [eaten])
       }
-    EFailure(old, errors, fatal) -> ESuccess(state, [])
-      // case fatal {
-      //   False -> ESuccess(state, [])
-      //   True -> EFailure(old, errors, fatal) // bubble up fatal errors.
-      // }
+    EFailure(_, _, _) -> ESuccess(state, [])
   }
 }
 
@@ -523,10 +549,6 @@ pub fn e_cont1_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
         EFailure(_, _, _) -> ESuccess(new, [eaten])
       }
     EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
-      // case fatal {
-      //   False -> ESuccess(state, [])
-      //   True -> EFailure(old, errors, fatal) // bubble up fatal errors.
-      // }
   }
 }
 
@@ -543,16 +565,28 @@ pub fn e_map(
   }
 }
 
-pub fn e_end() {
-  fn(state: EState) {
-    let EState(rest, tally) = state
-
-    case rest {
-      [] -> ESuccess(EState([], tally +1), END)
-      _ -> EFailure(state, ["Expected empty input."], False)
+pub fn e_map_err(
+  e: EFunction(s, e),
+  f: fn(e) -> e_new
+) -> EFunction(s, e_new) {
+  fn(state: EState) -> EResult(s, e_new) {
+    case e(state) {
+      ESuccess(new, eaten) -> ESuccess(new, eaten)
+      EFailure(old, error, fatal) -> EFailure(old, f(error), fatal)
     }
   }
 }
+
+// pub fn e_end() {
+//   fn(state: EState) {
+//     let EState(rest, tally) = state
+
+//     case rest {
+//       [] -> ESuccess(EState([], tally +1), END)
+//       _ -> EFailure(state, ["Expected empty input."], False)
+//     }
+//   }
+// }
 
 pub fn e_if(
   predicate: fn(String) -> Bool,
@@ -582,16 +616,19 @@ pub fn e_if(
 }
 
 pub fn e_char(char: String, fatal: Bool) -> EFunction(String, List(String)) {
-  e_if(fn(c) { c == char }, fatal, "'" <> char <> "'")
+  e_if(fn(c) { c == char }, fatal, "'" <> escape(char) <> "'")
 }
 
 pub fn e_string(str: String, fatal: Bool) -> EFunction(String, List(String)) {
   case string.to_graphemes(str) {
     [head, ..tail] -> {
       let e_head = e_char(head, fatal)
-      list.fold(from: e_head, over: tail, with: fn(e, char) {
-        e_seq(e, e_char(char, fatal), string.append)
-      })
+      let es_tail = list.map(tail, with: e_char(_, fatal))
+      e_seq_many([e_head, ..es_tail], string.append)
+      |> e_map_err(fn(err) { list.map(err, fn(s) { s <> " in '" <> str <> "'" }) })
+      // list.fold(from: e_head, over: tail, with: fn(e, char) {
+      //   e_seq(e, e_char(char, fatal), string.append)
+      // })
     }
     [] -> panic as "Cannot eat empty string."
   }

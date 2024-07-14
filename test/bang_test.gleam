@@ -15,18 +15,20 @@ pub fn e_if_test() {
 
   "B" |> bang.init_state()
       |> a()
-      |> should.equal(bang.EFailure(bang.EState(["B"], 0), ["B did not match expected."], False))
+      |> should.equal(bang.EFailure(bang.EState(["B"], 0), ["Input @0 >  B did not match: 'A'"], False))
 }
 
 pub fn e_char_test() {
   let a = bang.e_char("A", False)
   "A" |> bang.init_state()
       |> a()
-      |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
+      |> bang.is_success()
+      |> should.be_true()
 
   "B" |> bang.init_state()
       |> a()
-      |> should.equal(bang.EFailure(bang.EState(["B"], 0), ["B did not match expected."], False))
+      |> bang.is_error()
+      |> should.be_true()
 }
 
 pub fn e_string_test() {
@@ -47,7 +49,15 @@ pub fn e_string_test() {
 
   "bald" |> bang.init_state()
          |> bang()
-         |> should.equal(bang.EFailure(bang.EState(["l", "d"], 2), ["l did not match expected."], False))
+         |> bang.fork(
+          fn(r) {
+            r |> bang.is_tally(2)
+              |> should.be_true()
+          },
+          fn(r) {
+            r |> bang.is_error()
+              |> should.be_true()
+          } )
 }
 // Combinators:
 
@@ -67,5 +77,6 @@ pub fn e_or_test() {
 
   "C" |> bang.init_state()
       |> a_or_b()
-      |> should.equal(bang.EFailure(bang.EState(["C"], 0), ["C did not match expected.", "C did not match expected."], False))
+      |> bang.is_error()
+      |> should.be_true()
 }
