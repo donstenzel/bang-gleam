@@ -1,47 +1,44 @@
-import gleam/string
-import gleam/list
 import gleam/io
-import token
+import gleam/list
+import gleam/string
+import lib.{collapse_lr, escape, safe_parse}
 import parzerker.{
-  e_map,
-  e_if,
-  e_map_if,
-  e_seq_many,
-  e_or,
-  e_cont0, 
-  e_surr,
-  e_until,
-  e_cont1,
-  e_map_err,
-  ESuccess,
-  EState,
-  EFailure
+  EFailure, EState, ESuccess, e_cont0, e_cont1, e_if, e_map, e_map_err, e_map_if,
+  e_or, e_seq_many, e_surr, e_until,
 }
-import lib.{ collapse_lr, escape, safe_parse }
+import token
 
 pub fn lexing_test() {
   let bang = e_string("bang", False) |> e_map(token.String)
-  "bald" |> init_state_str()
-         |> bang()
-         |> io.debug()
+  "bald"
+  |> init_state_str()
+  |> bang()
+  |> io.debug()
 }
-
 
 pub fn init_state_str(str) {
   parzerker.EState(string.to_graphemes(str), 0)
 }
 
-pub fn e_char(char: String, fatal: Bool) -> parzerker.EFunction(String, String, List(String)) {
+pub fn e_char(
+  char: String,
+  fatal: Bool,
+) -> parzerker.EFunction(String, String, List(String)) {
   e_if(fn(c) { c == char }, fatal, "'" <> escape(char) <> "'")
 }
 
-pub fn e_string(str: String, fatal: Bool) -> parzerker.EFunction(String, String, List(String)) {
+pub fn e_string(
+  str: String,
+  fatal: Bool,
+) -> parzerker.EFunction(String, String, List(String)) {
   case string.to_graphemes(str) {
     [head, ..tail] -> {
       let e_head = e_char(head, fatal)
       let es_tail = list.map(tail, with: e_char(_, fatal))
       e_seq_many([e_head, ..es_tail], string.append)
-      |> e_map_err(fn(err) { list.map(err, fn(s) { s <> " in '" <> str <> "'" }) })
+      |> e_map_err(fn(err) {
+        list.map(err, fn(s) { s <> " in '" <> str <> "'" })
+      })
       // list.fold(from: e_head, over: tail, with: fn(e, char) {
       //   e_seq(e, e_char(char, fatal), string.append)
       // })
@@ -50,34 +47,18 @@ pub fn e_string(str: String, fatal: Bool) -> parzerker.EFunction(String, String,
   }
 }
 
-pub fn e_const_token(str: String, fatal: Bool, out: token.Token) -> parzerker.EFunction(String, token.Token, List(String)) {
+pub fn e_const_token(
+  str: String,
+  fatal: Bool,
+  out: token.Token,
+) -> parzerker.EFunction(String, token.Token, List(String)) {
   e_string(str, fatal) |> e_map(fn(_) { out })
 }
 
-
-
 const keywords = [
-  "var",
-  "val",
-  "fun",
-  "return",
-  "true",
-  "false",
-  "if",
-  "else",
-  "while",
-  "for",
-  "in",
-  "match",
-  "area",
-  "struct",
-  "enum",
-  "this",
-  "extend",
-  "extension",
-  "like"
+  "var", "val", "fun", "return", "true", "false", "if", "else", "while", "for",
+  "in", "match", "area", "struct", "enum", "this", "extend", "extension", "like",
 ]
-
 
 pub fn e_end() {
   fn(state: parzerker.State(i)) {
@@ -90,8 +71,9 @@ pub fn e_end() {
   }
 }
 
-
-pub fn parse(state: parzerker.State(String)) -> parzerker.EResult(String, List(token.Token), List(String)) {
+pub fn parse(
+  state: parzerker.State(String),
+) -> parzerker.EResult(String, List(token.Token), List(String)) {
   let e_lparen = e_const_token("(", False, token.Leftparen)
   let e_rparen = e_const_token(")", False, token.Rightparen)
   let e_lbrckt = e_const_token("[", False, token.Leftbracket)
@@ -142,76 +124,82 @@ pub fn parse(state: parzerker.State(String)) -> parzerker.EResult(String, List(t
   let e_xtnsn = e_const_token("extension", False, token.Extension)
   let e_like = e_const_token("like", False, token.Like)
 
-  let e_cmmnt = parzerker.e_seq_r(
-    e_char("#", False),
-    parzerker.e_if(fn(chr) { chr != "\n" }, False, "not new-line") |> parzerker.e_cont0(),
-    // fn(_, cntnt) { cntnt }
-  ) |> parzerker.e_map(fn(str) {
-    str |> collapse_lr()
-        |> token.Comment()
-  })
+  let e_cmmnt =
+    parzerker.e_seq_r(
+      e_char("#", False),
+      parzerker.e_if(fn(chr) { chr != "\n" }, False, "not new-line")
+        |> parzerker.e_cont0()
+    )
+    |> parzerker.e_map(fn(str) {
+      str
+      |> collapse_lr()
+      |> token.Comment()
+    })
 
   let e_space = " " |> e_char(False)
   let e_tab = "\t" |> e_char(False)
   let e_newln = "\n" |> e_char(False)
 
-  let e_whtspc = e_space
-  |> e_or(e_tab, list.append) 
-  |> e_or(e_newln, list.append)
-  |> e_cont1()
-  |> e_map(fn(str) {
-    str |> collapse_lr()
-        |> escape()
-        |> token.Whitespace()
-  })
-  |> e_map_err(fn(errs) {
-    errs |> list.map(fn(err) {
-      err <> " (Whitespace)"
+  let e_whtspc =
+    e_space
+    |> e_or(e_tab, list.append)
+    |> e_or(e_newln, list.append)
+    |> e_cont1()
+    |> e_map(fn(str) {
+      str
+      |> collapse_lr()
+      |> escape()
+      |> token.Whitespace()
     })
-  })
+    |> e_map_err(fn(errs) {
+      errs
+      |> list.map(fn(err) { err <> " (Whitespace)" })
+    })
 
   let e_quote = "'" |> e_char(False)
-  let e_strcntnt = e_if(fn(c) { c != "'" }, False, "not '")
-                   |> e_cont0()
-  let e_str = e_surr(e_quote, e_strcntnt, e_quote)
-              |> e_map(fn(chrs) {
-                chrs |> collapse_lr()
-                     |> token.String()
-              })
-
-  let e_number = e_if(
-    fn(chr) {
-      "0123456789" |> string.contains(chr)
-    },
-    False,
-    "numeric"
-  ) |> e_cont1()
+  let e_strcntnt =
+    e_if(fn(c) { c != "'" }, False, "not '")
+    |> e_cont0()
+  let e_str =
+    e_surr(e_quote, e_strcntnt, e_quote)
     |> e_map(fn(chrs) {
-      chrs |> collapse_lr()
-           |> safe_parse()
-           |> token.Number()
+      chrs
+      |> collapse_lr()
+      |> token.String()
     })
 
-  let e_ident = e_if(
-    fn(chr) {
-      "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-      |> string.contains(chr)
-    },
-    False,
-    "alphabetic & _"
-  ) |> e_cont1()
+  let e_number =
+    e_if(fn(chr) { "0123456789" |> string.contains(chr) }, False, "numeric")
+    |> e_cont1()
+    |> e_map(fn(chrs) {
+      chrs
+      |> collapse_lr()
+      |> safe_parse()
+      |> token.Number()
+    })
+
+  let e_ident =
+    e_if(
+      fn(chr) {
+        "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        |> string.contains(chr)
+      },
+      False,
+      "alphabetic & _",
+    )
+    |> e_cont1()
     |> e_map_if(
       fn(chrs) {
         let str = chrs |> collapse_lr()
-        ! list.contains(keywords, str)
+        !list.contains(keywords, str)
       },
-      "Identifier cannot be a keyword."
+      "Identifier cannot be a keyword.",
     )
-    |> e_map(
-      fn(chrs) {
-        chrs |> collapse_lr()
-             |> token.Identifier()
-      })
+    |> e_map(fn(chrs) {
+      chrs
+      |> collapse_lr()
+      |> token.Identifier()
+    })
 
   let es = [
     e_ident,
@@ -270,13 +258,12 @@ pub fn parse(state: parzerker.State(String)) -> parzerker.EResult(String, List(t
     e_area,
   ]
 
-  state |> {
-    case list.reduce(
-      over: es,
-      with: fn(l, r) { e_or(l, r, list.append) }
-    ) {
+  state
+  |> {
+    case list.reduce(over: es, with: fn(l, r) { e_or(l, r, list.append) }) {
       Ok(p) -> p
       Error(_) -> panic as "this should work!"
-    } |> e_until(e_end())
+    }
+    |> e_until(e_end())
   }
 }

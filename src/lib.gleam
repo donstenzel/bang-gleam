@@ -1,6 +1,6 @@
 import gleam/int
-import gleam/string
 import gleam/list
+import gleam/string
 
 pub fn safe_parse(str) -> Int {
   case int.parse(str) {
@@ -10,11 +10,8 @@ pub fn safe_parse(str) -> Int {
 }
 
 pub fn fork(f1: fn(v) -> a, f2: fn(v) -> b) -> fn(v) -> #(a, b) {
-  fn(val: v) -> #(a, b) {
-    #(f1(val), f2(val))
-  }
+  fn(val: v) -> #(a, b) { #(f1(val), f2(val)) }
 }
-
 
 pub fn error_str(errors, fatal) {
   let heading = case fatal {
@@ -22,13 +19,9 @@ pub fn error_str(errors, fatal) {
     False -> "An error has occured:"
   }
 
-  list.fold(
-    from: heading,
-    over: errors,
-    with: fn(curr, e) {
-      curr <> "\n - " <> e
-    }
-  )
+  list.fold(from: heading, over: errors, with: fn(curr, e) {
+    curr <> "\n - " <> e
+  })
 }
 
 pub fn collapse_lr(str: List(String)) -> String {
@@ -54,7 +47,7 @@ pub fn escape(str: String) {
 
 pub fn escape_chr(chr: String) -> String {
   case chr {
-    " " ->  " "
+    " " -> " "
     "\"" -> "'"
     "\n" -> "↲"
     "\t" -> "→"

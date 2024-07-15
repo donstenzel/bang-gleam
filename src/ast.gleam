@@ -33,7 +33,8 @@ pub type Type {
   Just(Primitive)
 }
 
-pub type Argument = #(String, Type)
+pub type Argument =
+  #(String, Type)
 
 pub type Expression {
   Binary(left: Expression, op: Operator, right: Expression)
@@ -62,5 +63,5 @@ pub type Declaration {
   Function(name: String, args: List(Argument), body: Block)
 }
 
-pub type Block = List(Declaration)
-
+pub type Block =
+  List(Declaration)
