@@ -1,7 +1,6 @@
 import argv
 import gleam/erlang.{get_line as input}
 import gleam/io
-import gleam/string
 import lexing
 import lib
 import parsing
@@ -10,11 +9,8 @@ import simplifile
 import token
 
 pub fn main() {
-  [token.Number(10)]
-  |> parsing.init_state_token()
-  |> parsing.e_number()
-  |> string.inspect
-  |> io.println()
+  lexing.lexing_test()
+  parsing.parsing_test()
 
   startup()
 }
@@ -25,12 +21,12 @@ pub fn startup() {
       io.print(
         "Welcome to the bang! interactive environment. for now only tokenizes your input\n\n",
       )
-      repl(lexing.parse)
+      repl(lexing.lex)
     }
     [path] ->
       case simplifile.read(path) {
         Ok(source) ->
-          case source |> lexing.init_state_str |> lexing.parse() {
+          case source |> lexing.init_state_str |> lexing.lex() {
             parzerker.ESuccess(_, tokens) ->
               tokens |> token.repr_tokens() |> io.println()
             parzerker.EFailure(_, errors, fatal) ->
@@ -49,10 +45,7 @@ pub fn startup() {
   }
 }
 
-pub fn repl(
-  parse: fn(parzerker.State(String)) ->
-    parzerker.EResult(String, List(token.Token), List(String)),
-) {
+pub fn repl(parse: parzerker.EFunction(String, List(token.Token), List(String))) {
   case input("|> ") {
     Ok(str) ->
       case str |> lexing.init_state_str() |> parse() {

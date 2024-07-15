@@ -9,8 +9,26 @@ pub fn safe_parse(str) -> Int {
   }
 }
 
-pub fn fork(f1: fn(v) -> a, f2: fn(v) -> b) -> fn(v) -> #(a, b) {
-  fn(val: v) -> #(a, b) { #(f1(val), f2(val)) }
+pub fn fork(f1: fn(a) -> b, f2: fn(a) -> c) -> fn(a) -> #(b, c) {
+  fn(v: a) -> #(b, c) { #(f1(v), f2(v)) }
+}
+
+pub fn both(f: fn(a) -> b) -> fn(#(a, a)) -> #(b, b) {
+  fn(v: #(a, a)) -> #(b, b) {
+    let #(v1, v2) = v
+    #(f(v1), f(v2))
+  }
+}
+
+pub fn vectorize(f: fn(a) -> b) -> fn(List(a)) -> List(b) {
+  vectorized(f, _)
+}
+
+fn vectorized(f, vs) {
+  case vs {
+    [head, ..tail] -> [f(head), ..vectorized(f, tail)]
+    [] -> []
+  }
 }
 
 pub fn error_str(errors, fatal) {

@@ -10,9 +10,9 @@ import token
 
 pub fn lexing_test() {
   let bang = e_string("bang", False) |> e_map(token.String)
-  "bald"
-  |> init_state_str()
-  |> bang()
+  #("bald", "bang")
+  |> { init_state_str |> lib.both() }
+  |> { bang |> lib.both() }
   |> io.debug()
 }
 
@@ -71,7 +71,7 @@ pub fn e_end() {
   }
 }
 
-pub fn parse(
+pub fn lex(
   state: parzerker.State(String),
 ) -> parzerker.EResult(String, List(token.Token), List(String)) {
   let e_lparen = e_const_token("(", False, token.Leftparen)
@@ -128,7 +128,7 @@ pub fn parse(
     parzerker.e_seq_r(
       e_char("#", False),
       parzerker.e_if(fn(chr) { chr != "\n" }, False, "not new-line")
-        |> parzerker.e_cont0()
+        |> parzerker.e_cont0(),
     )
     |> parzerker.e_map(fn(str) {
       str
