@@ -1,82 +1,84 @@
 import gleam/list
 import gleeunit
 import gleeunit/should
-import bang
+import parzerker
+import lexing
+import lib
 
 pub fn main() {
   gleeunit.main()
 }
 
 pub fn e_if_test() {
-  let a = bang.e_if(fn(chr) { chr == "A" }, False, "'A'")
-  "A" |> bang.init_state_str()
+  let a = parzerker.e_if(fn(chr) { chr == "A" }, False, "'A'")
+  "A" |> lexing.init_state_str()
       |> a()
-      |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
+      |> should.equal(parzerker.ESuccess(parzerker.EState([], 1), "A"))
 
-  "B" |> bang.init_state_str()
+  "B" |> lexing.init_state_str()
       |> a()
-      |> should.equal(bang.EFailure(bang.EState(["B"], 0), ["Input @0 >  B did not match: 'A'"], False))
+      |> should.equal(parzerker.EFailure(parzerker.EState(["B"], 0), ["Input @0 >  'B' did not match: 'A'"], False))
 }
 
 pub fn e_char_test() {
-  let a = bang.e_char("A", False)
-  "A" |> bang.init_state_str()
+  let a = lexing.e_char("A", False)
+  "A" |> lexing.init_state_str()
       |> a()
-      |> bang.is_success()
+      |> parzerker.is_success()
       |> should.be_true()
 
-  "B" |> bang.init_state_str()
+  "B" |> lexing.init_state_str()
       |> a()
-      |> bang.is_error()
+      |> parzerker.is_error()
       |> should.be_true()
 }
 
 pub fn e_string_test() {
-  let bang = bang.e_string("bang", False)
-  "bang" |> bang.init_state_str()
+  let bang = lexing.e_string("bang", False)
+  "bang" |> lexing.init_state_str()
          |> bang()
-         |> should.equal(bang.ESuccess(bang.EState([], 4), "bang"))
+         |> should.equal(parzerker.ESuccess(parzerker.EState([], 4), "bang"))
   
   "bang and more"
-    |> bang.init_state_str()
+    |> lexing.init_state_str()
     |> bang()
     |> should.equal(
-      bang.ESuccess(
-        bang.EState([" ", "a", "n", "d", " ", "m", "o", "r", "e"], 4),
+      parzerker.ESuccess(
+        parzerker.EState([" ", "a", "n", "d", " ", "m", "o", "r", "e"], 4),
         "bang"
       )
     )
 
-  "bald" |> bang.init_state_str()
+  "bald" |> lexing.init_state_str()
          |> bang()
-         |> bang.fork(
+         |> lib.fork(
           fn(r) {
-            r |> bang.is_tally(2)
+            r |> parzerker.is_tally(2)
               |> should.be_true()
           },
           fn(r) {
-            r |> bang.is_error()
+            r |> parzerker.is_error()
               |> should.be_true()
           })
 }
 // Combinators:
 
 pub fn e_or_test() {
-  let a = bang.e_char("A", False)
-  let b = bang.e_char("B", False)
+  let a = lexing.e_char("A", False)
+  let b = lexing.e_char("B", False)
 
-  let a_or_b = bang.e_or(a, b, list.append)
+  let a_or_b = parzerker.e_or(a, b, list.append)
 
-  "A" |> bang.init_state_str()
+  "A" |> lexing.init_state_str()
       |> a_or_b()
-      |> should.equal(bang.ESuccess(bang.EState([], 1), "A"))
+      |> should.equal(parzerker.ESuccess(parzerker.EState([], 1), "A"))
 
-  "B" |> bang.init_state_str()
+  "B" |> lexing.init_state_str()
       |> a_or_b()
-      |> should.equal(bang.ESuccess(bang.EState([], 1), "B"))
+      |> should.equal(parzerker.ESuccess(parzerker.EState([], 1), "B"))
 
-  "C" |> bang.init_state_str()
+  "C" |> lexing.init_state_str()
       |> a_or_b()
-      |> bang.is_error()
+      |> parzerker.is_error()
       |> should.be_true()
 }
