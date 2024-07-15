@@ -4,17 +4,56 @@ import gleam/io
 import gleam/list
 import gleam/string
 import gleam/order
+import token
 import simplifile
 import argv
 
 pub fn main() {
-  let bang = e_string("bang", False) |> e_map(String)
-  "bald" |> init_state()
+  let bang = e_string("bang", False) |> e_map(token.String)
+  "bald" |> init_state_str()
          |> bang()
          |> io.debug()
 
+
+  [token.Number(10)]
+  |> init_state_token()
+  |> e_number()
+  |> string.inspect
+  |> io.println()
+
+
   startup()
+
   }
+
+pub fn startup() {
+  case argv.load().arguments {
+    [] -> {
+      io.print("Welcome to the bang! interactive environment. for now only tokenizes your input\n\n")
+      repl(parse)
+    }
+    [path] ->
+      case simplifile.read(path) {
+        Ok(source) -> case source |> init_state_str |> parse() {
+           ESuccess(_, tokens) -> tokens |> token.repr_tokens() |> io.println()
+           EFailure(_, errors, fatal) -> error_str(errors, fatal) |> io.println()
+        }
+        Error(e) -> { "Could not read file: " <> path <> "\n" <> simplifile.describe_error(e) } |> io.println()
+      }
+    _ -> io.println("Usage:\n - './bang' -> repl\n - './bang <path>' -> file")
+  }
+}
+
+pub fn repl(parse: fn(State(String)) -> EResult(String, List(token.Token), List(String))) {
+  case input("|> ") {
+    Ok(str) -> case str |> init_state_str() |> parse() {
+      ESuccess(_, tokens) -> tokens |> token.repr_tokens() |> io.println()
+      EFailure(_, errors, fatal) -> error_str(errors, fatal) |> io.println()
+    }
+    Error(_) -> io.println("Couldn't get line.")
+  }
+  repl(parse)
+}
 
 pub fn safe_parse(str) -> Int {
   case int.parse(str) {
@@ -27,39 +66,6 @@ pub fn fork(f1: fn(v) -> a, f2: fn(v) -> b) -> fn(v) -> #(a, b) {
   fn(val: v) -> #(a, b) {
     #(f1(val), f2(val))
   }
-}
-
-pub fn startup() {
-
-
-  case argv.load().arguments {
-    [] -> start_repl(parse)
-    [path] ->
-      case simplifile.read(path) {
-        Ok(source) -> case source |> init_state |> parse() {
-           ESuccess(_, tokens) -> tokens |> repr_tokens() |> io.println()
-           EFailure(_, errors, fatal) -> error_str(errors, fatal) |> io.println()
-        }
-        Error(e) -> { "Could not read file: " <> path <> "\n" <> simplifile.describe_error(e) } |> io.println()
-      }
-    _ -> io.println("Usage:\n - './bang' -> repl\n - './bang <path>' -> file")
-  }
-}
-
-pub fn start_repl(parse) {
-  io.print("Welcome to the bang! interactive environment. for now only tokenizes your input\n\n")
-  repl(parse)
-}
-
-pub fn repl(parse: fn(EState) -> EResult(List(Token), List(String))) {
-  case input("|> ") {
-    Ok(str) -> case str |> init_state() |> parse() {
-      ESuccess(_, tokens) -> tokens |> repr_tokens() |> io.println()
-      EFailure(_, errors, fatal) -> error_str(errors, fatal) |> io.println()
-    }
-    Error(_) -> io.println("Couldn't get line.")
-  }
-  repl(parse)
 }
 
 
@@ -150,183 +156,58 @@ const keywords = [
 ]
 
 
-pub fn repr_token(t: Token) -> String {
-  case t {
-    END             -> "End"
-    Leftparen       -> "("
-    Rightparen      -> ")"
-    Leftbracket     -> "["
-    Rightbracket    -> "]"
-    Leftbrace       -> "{"
-    Rightbrace      -> "}"
-    Plus            -> "+"
-    Minus           -> "-"
-    Star            -> "*"
-    Slash           -> "/"
-    Percent         -> "%"
-    And             -> "&"
-    Or              -> "|"
-    Less            -> "<"
-    Greater         -> ">"
-    Equals          -> "="
-    Bang            -> "!"
-    Dot             -> "."
-    Questionmark    -> "?"
-    Comma           -> ","
-    Colon           -> ":"
-    Tilde           -> "~"
-    Dequals         -> "=="
-    Lessequals      -> "<="
-    Greaterequals   -> ">="
-    Notequals       -> "!="
-    Leftshift       -> "<<"
-    Rightshift      -> ">>"
-    Pipe            -> "|>"
-    Bind            -> "->"
-    Variable        -> "var"
-    Value           -> "val"
-    Function        -> "fun"
-    Return          -> "return"
-    Tru             -> "true"
-    Fals            -> "false"
-    If              -> "if"
-    Else            -> "else"
-    While           -> "while"
-    For             -> "for"
-    In              -> "in"
-    Match           -> "match"
-    Area            -> "area"
-    Structure       -> "struct"
-    Enumeration     -> "enum"
-    This            -> "this"
-    Extend          -> "extend"
-    Extension       -> "extension"
-    Like            -> "like"
-    String(str)     -> "String: '"     <> str <> "'"
-    Number(num)     -> "Number: "      <> num |> int.to_string
-    Comment(str)    -> "Comment: #"    <> str
-    Identifier(str) -> "Ident: "       <> str
-    Whitespace(str) -> "Whitespace: '" <> str <> "'"
-  }
-}
 
 
-
-pub fn repr_tokens(tokens: List(Token)) -> String {
-  list.fold(from: "", over: tokens, with: fn(curr, next) {
-      curr <> repr_token(next) <> ", "
-    })
-}
-
-pub type Token {
-  END
-  Leftparen
-  Rightparen
-  Leftbracket
-  Rightbracket
-  Leftbrace
-  Rightbrace
-  Plus
-  Minus
-  Star
-  Slash
-  Percent
-  And
-  Or
-  Less
-  Greater
-  Equals
-  Bang
-  Dot
-  Questionmark
-  Comma
-  Colon
-  Tilde
-  Dequals
-  Lessequals
-  Greaterequals
-  Notequals
-  Leftshift
-  Rightshift
-  Pipe
-  Bind
-  Variable
-  Value
-  Function
-  Return
-  Tru
-  Fals
-  If
-  Else
-  While
-  For
-  In
-  Match
-  Area
-  Structure
-  Enumeration
-  This
-  Extend
-  Extension
-  Like
-  String(String)
-  Number(Int)
-  Comment(String)
-  Identifier(String)
-  Whitespace(String)
-}
-
-
-pub fn parse(state) {
-  let e_lparen = e_const_token("(", False, Leftparen)
-  let e_rparen = e_const_token(")", False, Rightparen)
-  let e_lbrckt = e_const_token("[", False, Leftbracket)
-  let e_rbrckt = e_const_token("]", False, Rightbracket)
-  let e_lbrace = e_const_token("{", False, Leftbrace)
-  let e_rbrace = e_const_token("}", False, Rightbrace)
-  let e_plus = e_const_token("+", False, Plus)
-  let e_minus = e_const_token("-", False, Minus)
-  let e_star = e_const_token("*", False, Star)
-  let e_slash = e_const_token("/", False, Slash)
-  let e_prcnt = e_const_token("%", False, Percent)
-  let e_and = e_const_token("&", False, And)
-  let e_ort = e_const_token("|", False, Or)
-  let e_less = e_const_token("<", False, Less)
-  let e_great = e_const_token(">", False, Greater)
-  let e_equals = e_const_token("=", False, Equals)
-  let e_bang = e_const_token("!", False, Bang)
-  let e_dot = e_const_token(".", False, Dot)
-  let e_qstmrk = e_const_token("?", False, Questionmark)
-  let e_comma = e_const_token(",", False, Comma)
-  let e_colon = e_const_token(":", False, Colon)
-  let e_tilde = e_const_token("~", False, Tilde)
-  let e_dequal = e_const_token("==", False, Dequals)
-  let e_lteq = e_const_token("<=", False, Lessequals)
-  let e_gteq = e_const_token(">=", False, Greaterequals)
-  let e_nequal = e_const_token("!=", False, Notequals)
-  let e_lshift = e_const_token("<<", False, Leftshift)
-  let e_rshift = e_const_token(">>", False, Rightshift)
-  let e_pipe = e_const_token("|>", False, Pipe)
-  let e_bind = e_const_token("->", False, Bind)
-  let e_var = e_const_token("var", False, Variable)
-  let e_val = e_const_token("val", False, Value)
-  let e_fun = e_const_token("fun", False, Function)
-  let e_ret = e_const_token("return", False, Return)
-  let e_true = e_const_token("true", False, Tru)
-  let e_false = e_const_token("false", False, Fals)
-  let e_ift = e_const_token("if", False, If)
-  let e_else = e_const_token("else", False, Else)
-  let e_while = e_const_token("while", False, While)
-  let e_for = e_const_token("for", False, For)
-  let e_in = e_const_token("in", False, In)
-  let e_match = e_const_token("match", False, Match)
-  let e_area = e_const_token("area", False, Area)
-  let e_struct = e_const_token("struct", False, Structure)
-  let e_enum = e_const_token("enum", False, Enumeration)
-  let e_this = e_const_token("this", False, This)
-  let e_xtend = e_const_token("extend", False, Extend)
-  let e_xtnsn = e_const_token("extension", False, Extension)
-  let e_like = e_const_token("like", False, Like)
+pub fn parse(state: State(String)) -> EResult(String, List(token.Token), List(String)) {
+  let e_lparen = e_const_token("(", False, token.Leftparen)
+  let e_rparen = e_const_token(")", False, token.Rightparen)
+  let e_lbrckt = e_const_token("[", False, token.Leftbracket)
+  let e_rbrckt = e_const_token("]", False, token.Rightbracket)
+  let e_lbrace = e_const_token("{", False, token.Leftbrace)
+  let e_rbrace = e_const_token("}", False, token.Rightbrace)
+  let e_plus = e_const_token("+", False, token.Plus)
+  let e_minus = e_const_token("-", False, token.Minus)
+  let e_star = e_const_token("*", False, token.Star)
+  let e_slash = e_const_token("/", False, token.Slash)
+  let e_prcnt = e_const_token("%", False, token.Percent)
+  let e_and = e_const_token("&", False, token.And)
+  let e_ort = e_const_token("|", False, token.Or)
+  let e_less = e_const_token("<", False, token.Less)
+  let e_great = e_const_token(">", False, token.Greater)
+  let e_equals = e_const_token("=", False, token.Equals)
+  let e_bang = e_const_token("!", False, token.Bang)
+  let e_dot = e_const_token(".", False, token.Dot)
+  let e_qstmrk = e_const_token("?", False, token.Questionmark)
+  let e_comma = e_const_token(",", False, token.Comma)
+  let e_colon = e_const_token(":", False, token.Colon)
+  let e_tilde = e_const_token("~", False, token.Tilde)
+  let e_dequal = e_const_token("==", False, token.Dequals)
+  let e_lteq = e_const_token("<=", False, token.Lessequals)
+  let e_gteq = e_const_token(">=", False, token.Greaterequals)
+  let e_nequal = e_const_token("!=", False, token.Notequals)
+  let e_lshift = e_const_token("<<", False, token.Leftshift)
+  let e_rshift = e_const_token(">>", False, token.Rightshift)
+  let e_pipe = e_const_token("|>", False, token.Pipe)
+  let e_bind = e_const_token("->", False, token.Bind)
+  let e_var = e_const_token("var", False, token.Variable)
+  let e_val = e_const_token("val", False, token.Value)
+  let e_fun = e_const_token("fun", False, token.Function)
+  let e_ret = e_const_token("return", False, token.Return)
+  let e_true = e_const_token("true", False, token.Tru)
+  let e_false = e_const_token("false", False, token.Fals)
+  let e_ift = e_const_token("if", False, token.If)
+  let e_else = e_const_token("else", False, token.Else)
+  let e_while = e_const_token("while", False, token.While)
+  let e_for = e_const_token("for", False, token.For)
+  let e_in = e_const_token("in", False, token.In)
+  let e_match = e_const_token("match", False, token.Match)
+  let e_area = e_const_token("area", False, token.Area)
+  let e_struct = e_const_token("struct", False, token.Structure)
+  let e_enum = e_const_token("enum", False, token.Enumeration)
+  let e_this = e_const_token("this", False, token.This)
+  let e_xtend = e_const_token("extend", False, token.Extend)
+  let e_xtnsn = e_const_token("extension", False, token.Extension)
+  let e_like = e_const_token("like", False, token.Like)
 
   let e_cmmnt = e_seq_r(
     e_char("#", False),
@@ -334,7 +215,7 @@ pub fn parse(state) {
     // fn(_, cntnt) { cntnt }
   ) |> e_map(fn(str) {
     str |> collapse_lr()
-        |> Comment()
+        |> token.Comment()
   })
 
   let e_space = " " |> e_char(False)
@@ -348,7 +229,7 @@ pub fn parse(state) {
   |> e_map(fn(str) {
     str |> collapse_lr()
         |> escape()
-        |> Whitespace()
+        |> token.Whitespace()
   })
   |> e_map_err(fn(errs) {
     errs |> list.map(fn(err) {
@@ -362,7 +243,7 @@ pub fn parse(state) {
   let e_str = e_surr(e_quote, e_strcntnt, e_quote)
               |> e_map(fn(chrs) {
                 chrs |> collapse_lr()
-                     |> String()
+                     |> token.String()
               })
 
   let e_number = e_if(
@@ -375,7 +256,7 @@ pub fn parse(state) {
     |> e_map(fn(chrs) {
       chrs |> collapse_lr()
            |> safe_parse()
-           |> Number()
+           |> token.Number()
     })
 
   let e_ident = e_if(
@@ -396,7 +277,7 @@ pub fn parse(state) {
     |> e_map(
       fn(chrs) {
         chrs |> collapse_lr()
-             |> Identifier()
+             |> token.Identifier()
       })
 
   let es = [
@@ -468,48 +349,48 @@ pub fn parse(state) {
 }
 
 
-pub type EState {
-  EState(rest: List(String), tally: Int)
+pub type State(i) {
+  EState(rest: List(i), tally: Int)
 }
 
-pub fn init_state(str) {
+pub fn init_state_str(str) {
   EState(string.to_graphemes(str), 0)
 }
 
-pub type EResult(s, e) {
-  ESuccess(new: EState, eaten: s)
-  EFailure(old: EState, error: e, fatal: Bool)
+pub type EResult(i, s, e) {
+  ESuccess(new: State(i), eaten: s)
+  EFailure(old: State(i), error: e, fatal: Bool)
 }
 
-pub fn is_success(r: EResult(_, _)) -> Bool {
+pub fn is_success(r: EResult(_, _, _)) -> Bool {
   case r {
     ESuccess(_, _) -> True
     EFailure(_, _, _) -> False
   }
 }
 
-pub fn is_error(r: EResult(_, _)) -> Bool {
+pub fn is_error(r: EResult(_, _, _)) -> Bool {
   case r {
     ESuccess(_, _) -> False
     EFailure(_, _, _) -> True
   }
 }
 
-pub fn is_tally(r: EResult(_, _), to_match) -> Bool {
+pub fn is_tally(r: EResult(_, _, _), to_match) -> Bool {
   case r {
     ESuccess(EState(_, tally), _) -> tally == to_match
     EFailure(EState(_, tally), _, _) -> tally == to_match
   }
 }
 
-pub type EFunction(r, e) = fn(EState) -> EResult(r, e)
+pub type EFunction(input, parsed, error) = fn(State(input)) -> EResult(input, parsed, error)
 
 pub fn e_seq(
-  e1: EFunction(s1, e),
-  e2: EFunction(s2, e),
+  e1: EFunction(i, s1, e),
+  e2: EFunction(i, s2, e),
   combine_eaten: fn(s1, s2) -> s_new
-) -> EFunction(s_new, e) {
-  fn(state: EState) -> EResult(s_new, e) {
+) -> EFunction(i, s_new, e) {
+  fn(state: State(i)) -> EResult(i, s_new, e) {
     case e1(state) {
       EFailure(state, error, fatal) -> EFailure(state, error, fatal)
       ESuccess(new, eaten1) -> 
@@ -522,31 +403,31 @@ pub fn e_seq(
 }
 
 pub fn e_seq_l(
-  e1: EFunction(s, e),
-  e2: EFunction(_, e)
-) -> EFunction(s, e) {
+  e1: EFunction(i, s, e),
+  e2: EFunction(i, _, e)
+) -> EFunction(i, s, e) {
   e_seq(e1, e2, fn(l, _) { l })
 } 
 
 pub fn e_seq_r(
-  e1: EFunction(_, e),
-  e2: EFunction(s, e)
-) -> EFunction(s, e) {
+  e1: EFunction(i, _, e),
+  e2: EFunction(i, s, e)
+) -> EFunction(i, s, e) {
   e_seq(e1, e2, fn(_, r) { r })
 }
 
 pub fn e_surr(
-  l: EFunction(_, e),
-  e: EFunction(s, e),
-  r: EFunction(_, e)
-) -> EFunction(s, e) {
+  l: EFunction(i, _, e),
+  e: EFunction(i, s, e),
+  r: EFunction(i, _, e)
+) -> EFunction(i, s, e) {
   e_seq_r(l, e_seq_l(e, r))
 }
 
 pub fn e_seq_many(
-  es: List(EFunction(s, e)),
+  es: List(EFunction(i, s, e)),
   combine_eaten: fn(s, s) -> s
-) -> EFunction(s, e) {
+) -> EFunction(i, s, e) {
   case es {
     [head, ..tail] -> {
       list.fold(from: head, over: tail, with: fn(e1, e2) {
@@ -558,11 +439,11 @@ pub fn e_seq_many(
 }
 
 pub fn e_or(
-  e1: EFunction(s, e),
-  e2: EFunction(s, e),
+  e1: EFunction(i, s, e),
+  e2: EFunction(i, s, e),
   combine_errors: fn(e, e) -> e
-) -> EFunction(s, e) {
-  fn(state: EState) -> EResult(s, e) {
+) -> EFunction(i, s, e) {
+  fn(state: State(i)) -> EResult(i, s, e) {
     case e1(state), e2(state) {
 
       ESuccess(EState(_, tally1), _) as s1, ESuccess(EState(_, tally2), _) as s2 -> {
@@ -594,10 +475,10 @@ pub fn e_or(
 }
 
 pub fn e_opt(
-  e: EFunction(s, e),
+  e: EFunction(i, s, e),
   zero: s // the zero element under this operation over s.
-) -> EFunction(s, e) {
-  fn(state: EState) -> EResult(s, e) {
+) -> EFunction(i, s, e) {
+  fn(state: State(i)) -> EResult(i, s, e) {
     case e(state) {
       EFailure(_, _, _) -> ESuccess(state, zero)
       ESuccess(_, _) as s -> s
@@ -605,11 +486,11 @@ pub fn e_opt(
   }
 }
 
-pub fn e_cont0(e: EFunction(s, e)) -> EFunction(List(s), e) {
+pub fn e_cont0(e: EFunction(i, s, e)) -> EFunction(i, List(s), e) {
   e_cont0_rec(e, _)
 }
 
-pub fn e_cont0_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
+pub fn e_cont0_rec(e: EFunction(i, s, e), state: State(i)) -> EResult(i, List(s), e) {
   case e(state) {
     ESuccess(new, eaten) ->
       case e_cont1_rec(e, new) {
@@ -620,11 +501,11 @@ pub fn e_cont0_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
   }
 }
 
-pub fn e_cont1(e: EFunction(s, e)) -> EFunction(List(s), e) {
+pub fn e_cont1(e: EFunction(i, s, e)) -> EFunction(i, List(s), e) {
   e_cont1_rec(e, _)
 }
 
-pub fn e_cont1_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
+pub fn e_cont1_rec(e: EFunction(i, s, e), state: State(i)) -> EResult(i, List(s), e) {
   case e(state) {
     ESuccess(new, eaten) ->
       case e_cont1_rec(e, new) {
@@ -637,10 +518,10 @@ pub fn e_cont1_rec(e: EFunction(s, e), state: EState) -> EResult(List(s), e) {
 
 
 pub fn e_map(
-  e: EFunction(s, e),
+  e: EFunction(i, s, e),
   f: fn(s) -> s_new
-) -> EFunction(s_new, e) {
-  fn(state: EState) -> EResult(s_new, e) {
+) -> EFunction(i, s_new, e) {
+  fn(state: State(i)) -> EResult(i, s_new, e) {
     case e(state) {
       EFailure(state, error, fatal) -> EFailure(state, error, fatal)
       ESuccess(new, eaten) -> ESuccess(new, f(eaten))
@@ -649,11 +530,11 @@ pub fn e_map(
 }
 
 pub fn e_map_if(
-  e: EFunction(s, List(String)),
+  e: EFunction(i, s, List(String)),
   p: fn(s) -> Bool,
   description: String
-) -> EFunction(s, List(String)) {
-  fn(state: EState) -> EResult(s, List(String)) {
+) -> EFunction(i, s, List(String)) {
+  fn(state: State(i)) -> EResult(i, s, List(String)) {
     case e(state) {
       EFailure(_, _, _) as f -> f
       ESuccess(_, eaten) as s ->
@@ -666,10 +547,10 @@ pub fn e_map_if(
 }
 
 pub fn e_map_err(
-  e: EFunction(s, e),
+  e: EFunction(i, s, e),
   f: fn(e) -> e_new
-) -> EFunction(s, e_new) {
-  fn(state: EState) -> EResult(s, e_new) {
+) -> EFunction(i, s, e_new) {
+  fn(state: State(i)) -> EResult(i, s, e_new) {
     case e(state) {
       ESuccess(new, eaten) -> ESuccess(new, eaten)
       EFailure(old, error, fatal) -> EFailure(old, f(error), fatal)
@@ -678,21 +559,28 @@ pub fn e_map_err(
 }
 
 pub fn e_end() {
-  fn(state: EState) {
+  fn(state: State(i)) {
     let EState(rest, tally) = state
 
     case rest {
-      [] -> ESuccess(EState([], tally), END)
+      [] -> ESuccess(EState([], tally), token.END)
       _ -> EFailure(state, ["Expected empty input."], False)
     }
   }
 }
 
-pub fn e_until(e: EFunction(s, e), end: EFunction(s, e)) -> EFunction(List(s), e) {
+pub fn e_until(
+  e: EFunction(i, s, e),
+  end: EFunction(i, s, e)
+) -> EFunction(i, List(s), e) {
   e_until_inner(_, e, end)
 }
 
-pub fn e_until_inner(state: EState, e: EFunction(s, e), end: EFunction(s, e)) -> EResult(List(s), e) {
+pub fn e_until_inner(
+  state: State(i),
+  e: EFunction(i, s, e),
+  end: EFunction(i, s, e)
+) -> EResult(i, List(s), e) {
   case end(state) {
     EFailure(_, _, _) ->
       case e(state) {
@@ -712,11 +600,11 @@ pub fn e_until_inner(state: EState, e: EFunction(s, e), end: EFunction(s, e)) ->
 
 
 pub fn e_if(
-  predicate: fn(String) -> Bool,
+  predicate: fn(i) -> Bool,
   fatal: Bool,
   description: String // describes the predicate
-) -> EFunction(String, List(String)) {
-  fn(state: EState) -> EResult(String, List(String)) {
+) -> EFunction(i, i, List(String)) {
+  fn(state: State(i)) -> EResult(i, i, List(String)) {
     let EState(rest, tally) = state
 
     case rest {
@@ -728,7 +616,7 @@ pub fn e_if(
             [ "Input @"
             <> int.to_string(tally)
             <> " >  "
-            <> escape(head)
+            <> { head |> string.inspect() }
             <> " did not match: "
             <> description ],
             fatal)
@@ -738,11 +626,11 @@ pub fn e_if(
   }
 }
 
-pub fn e_char(char: String, fatal: Bool) -> EFunction(String, List(String)) {
+pub fn e_char(char: String, fatal: Bool) -> EFunction(String, String, List(String)) {
   e_if(fn(c) { c == char }, fatal, "'" <> escape(char) <> "'")
 }
 
-pub fn e_string(str: String, fatal: Bool) -> EFunction(String, List(String)) {
+pub fn e_string(str: String, fatal: Bool) -> EFunction(String, String, List(String)) {
   case string.to_graphemes(str) {
     [head, ..tail] -> {
       let e_head = e_char(head, fatal)
@@ -757,6 +645,27 @@ pub fn e_string(str: String, fatal: Bool) -> EFunction(String, List(String)) {
   }
 }
 
-pub fn e_const_token(str: String, fatal: Bool, out: Token) -> EFunction(Token, List(String)) {
+pub fn e_const_token(str: String, fatal: Bool, out: token.Token) -> EFunction(String, token.Token, List(String)) {
   e_string(str, fatal) |> e_map(fn(_) { out })
+}
+
+
+fn e_number(state: State(token.Token)) {
+  state
+  |> {
+    e_if(fn(t) {
+      case t {
+        token.Number(_) -> True
+        _ -> False
+      }
+    }, False, "Number")
+    |> e_map(fn(t) {
+      let assert token.Number(n) = t
+      n
+    })
+  }
+}
+
+pub fn init_state_token(tkns) {
+  EState(tkns, 0)
 }

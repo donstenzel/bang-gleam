@@ -1,4 +1,5 @@
 import gleam/option
+
 pub type Operator {
   Plus
   Minus
@@ -62,3 +63,4 @@ pub type Declaration {
 }
 
 pub type Block = List(Declaration)
+
