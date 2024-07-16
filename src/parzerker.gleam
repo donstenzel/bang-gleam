@@ -10,7 +10,7 @@ pub type State(i) {
 
 pub type EResult(i, s, e) {
   ESuccess(new: State(i), eaten: s)
-  EFailure(old: State(i), error: e, fatal: Bool)
+  EFailure(tally: Int, error: e, fatal: Bool)
 }
 
 pub fn is_success(r: EResult(_, _, _)) -> Bool {
@@ -30,7 +30,7 @@ pub fn is_error(r: EResult(_, _, _)) -> Bool {
 pub fn is_tally(r: EResult(_, _, _), to_match) -> Bool {
   case r {
     ESuccess(EState(_, tally), _) -> tally == to_match
-    EFailure(EState(_, tally), _, _) -> tally == to_match
+    EFailure(tally, _, _) -> tally == to_match
   }
 }
 
@@ -111,14 +111,14 @@ pub fn e_or(
       | ESuccess(_, _) as s, EFailure(_, _, _)
       -> s
 
-      EFailure(EState(_, tally1) as old, error1, fatal1) as f1,
-        EFailure(EState(_, tally2), error2, fatal2) as f2
+      EFailure(tally1, error1, fatal1) as f1,
+        EFailure(tally2, error2, fatal2) as f2
       -> {
         case int.compare(tally1, tally2) {
           order.Lt -> f2
           order.Gt -> f1
           order.Eq ->
-            EFailure(old, combine_errors(error1, error2), fatal1 || fatal2)
+            EFailure(tally1, combine_errors(error1, error2), fatal1 || fatal2)
         }
       }
     }
@@ -170,7 +170,7 @@ pub fn e_cont1_rec(
         ESuccess(newer, eaten_tail) -> ESuccess(newer, [eaten, ..eaten_tail])
         EFailure(_, _, _) -> ESuccess(new, [eaten])
       }
-    EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
+    EFailure(tally, errors, fatal) -> EFailure(tally, errors, fatal)
   }
 }
 
@@ -194,7 +194,7 @@ pub fn e_map_if(
       ESuccess(_, eaten) as s ->
         case p(eaten) {
           True -> s
-          False -> EFailure(state, [description], False)
+          False -> EFailure(state.tally, [description], False)
         }
     }
   }
@@ -207,7 +207,7 @@ pub fn e_map_err(
   fn(state: State(i)) -> EResult(i, s, e_new) {
     case e(state) {
       ESuccess(new, eaten) -> ESuccess(new, eaten)
-      EFailure(old, error, fatal) -> EFailure(old, f(error), fatal)
+      EFailure(tally, error, fatal) -> EFailure(tally, f(error), fatal)
     }
   }
 }
@@ -232,9 +232,9 @@ pub fn e_until_inner(
             ESuccess(newer, eaten_tail) -> {
               ESuccess(newer, [eaten, ..eaten_tail])
             }
-            EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
+            EFailure(tally, errors, fatal) -> EFailure(tally, errors, fatal)
           }
-        EFailure(old, errors, fatal) -> EFailure(old, errors, fatal)
+        EFailure(tally, errors, fatal) -> EFailure(tally, errors, fatal)
       }
     ESuccess(newer, eaten2) -> ESuccess(newer, [eaten2])
   }
@@ -255,7 +255,7 @@ pub fn e_if(
           True -> ESuccess(EState(tail, tally + 1), head)
           False ->
             EFailure(
-              state,
+              tally,
               [
                 "Input @"
                 <> int.to_string(tally)
@@ -267,7 +267,7 @@ pub fn e_if(
               fatal,
             )
         }
-      [] -> EFailure(EState([], tally), ["No input left to match."], True)
+      [] -> EFailure(tally, ["No input left to match."], True)
     }
   }
 }

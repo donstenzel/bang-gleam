@@ -11,7 +11,7 @@ import token
 pub fn main() {
   lexing.lexing_test()
   parsing.parsing_test()
-  //startup()
+  startup()
 }
 
 pub fn startup() {
@@ -20,17 +20,11 @@ pub fn startup() {
       io.print(
         "Welcome to the bang! interactive environment. for now only tokenizes your input\n\n",
       )
-      repl(lexing.lex)
+      repl()
     }
     [path] ->
       case simplifile.read(path) {
-        Ok(source) ->
-          case source |> lexing.init_state_str |> lexing.lex() {
-            parzerker.ESuccess(_, tokens) ->
-              tokens |> token.repr_tokens() |> io.println()
-            parzerker.EFailure(_, errors, fatal) ->
-              lib.error_str(errors, fatal) |> io.println()
-          }
+        Ok(source) -> interpret(source)
         Error(e) ->
           {
             "Could not read file: "
@@ -44,16 +38,71 @@ pub fn startup() {
   }
 }
 
-pub fn repl(parse: parzerker.EFunction(String, List(token.Token), List(String))) {
-  case input("|> ") {
-    Ok(str) ->
-      case str |> lexing.init_state_str() |> parse() {
-        parzerker.ESuccess(_, tokens) ->
-          tokens |> token.repr_tokens() |> io.println()
+pub fn repl() {
+  case input("!> ") {
+    Ok(str) -> interpret2(str)
+    Error(_) -> io.println("Couldn't get line.")
+  }
+  repl()
+}
+
+fn interpret(str: String) {
+  case str |> lexing.init_state_str() |> lexing.lex() {
+    parzerker.ESuccess(_, tokens) -> {
+      io.println("Successfully tokenized input:")
+      tokens |> token.repr_tokens() |> io.println()
+
+      case
+        tokens
+        |> token.drop_ws()
+        |> parsing.init_state_token()
+        |> parsing.e_decl()
+      {
+        parzerker.ESuccess(_, decl) -> {
+          io.println("Successfully parsed tokens:")
+          decl |> io.debug()
+          Nil
+        }
         parzerker.EFailure(_, errors, fatal) ->
           lib.error_str(errors, fatal) |> io.println()
       }
-    Error(_) -> io.println("Couldn't get line.")
+    }
+    parzerker.EFailure(_, errors, fatal) ->
+      lib.error_str(errors, fatal) |> io.println()
   }
-  repl(parse)
+}
+
+fn interpret2(str) {
+  let out = {
+    let state = str |> lexing.init_state_str()
+
+    use succ <- on_success(lexing.lex(state))
+    let assert parzerker.ESuccess(_, lexed) = succ
+
+    io.println("Successfully tokenized input:")
+    lexed |> token.repr_tokens() |> io.println()
+
+    let state = lexed |> parsing.init_state_token()
+
+    use succ <- on_success(parsing.e_file(state))
+    let assert parzerker.ESuccess(_, parsed) = succ
+
+    io.println("Successfully parsed tokens:")
+    io.debug(parsed)
+
+    succ
+  }
+  case out {
+    parzerker.ESuccess(_, _) -> Nil
+    parzerker.EFailure(_, errors, fatal) ->
+      lib.error_str(errors, fatal) |> io.println()
+  }
+}
+
+fn on_success(res, func) {
+  case res {
+    parzerker.ESuccess(_, _) as s -> func(s)
+    parzerker.EFailure(tally, error, fatal) ->
+      parzerker.EFailure(tally, error, fatal)
+  }
 }

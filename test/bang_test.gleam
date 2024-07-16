@@ -20,7 +20,7 @@ pub fn e_if_test() {
   |> lexing.init_state_str()
   |> a()
   |> should.equal(parzerker.EFailure(
-    parzerker.EState(["B"], 0),
+    0,
     ["Input @0 >  'B' did not match: 'A'"],
     False,
   ))

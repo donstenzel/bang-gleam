@@ -6,7 +6,13 @@ import token
 import parzerker
 
 pub fn parsing_test() {
-  [token.Leftparen, token.Minus, token.Number(100), token.Rightparen]
+  [
+    token.Leftparen,
+    token.Minus,
+    token.Number(100),
+    token.Rightparen,
+    token.Bang,
+  ]
   |> { init_state_token }
   |> { e_decl }
   |> io.debug()
@@ -345,4 +351,9 @@ pub fn e_prefix(state) {
     e_unary
     |> parzerker.e_seq(e_literal, fn(op, lit) { ast.Prefix(op, lit) })
   }
+}
+
+pub fn e_file(state) {
+  state
+  |> { e_decl |> parzerker.e_cont0 }
 }

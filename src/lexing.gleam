@@ -66,7 +66,7 @@ pub fn e_end() {
 
     case rest {
       [] -> ESuccess(EState([], tally), token.END)
-      _ -> EFailure(state, ["Expected empty input."], False)
+      _ -> EFailure(tally, ["Expected empty input."], False)
     }
   }
 }

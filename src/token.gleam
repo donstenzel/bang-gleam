@@ -124,3 +124,13 @@ pub fn repr_tokens(tokens: List(Token)) -> String {
     curr <> repr_token(next) <> ", "
   })
 }
+
+pub fn drop_ws(tokens: List(Token)) -> List(Token) {
+  tokens
+  |> list.filter(fn(t) {
+    case t {
+      Whitespace(_) -> False
+      _ -> True
+    }
+  })
+}
