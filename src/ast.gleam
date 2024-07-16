@@ -11,14 +11,27 @@ pub type Operator {
   Dot
   And
   Or
+  Less
+  Greater
+  IsEqual
+  GreaterEquals
+  LessEquals
+  LeftShift
+  RightShift
+  Pipe
 }
 
 pub type Literal {
   String(String)
   Number(Int)
   Boolean(Bool)
-  Reference(String)
+  Reference(Reference)
   ParenExpression(Expression)
+}
+
+pub type Reference {
+  Direct(String)
+  Indirect(String, Reference)
 }
 
 pub type Primitive {
@@ -38,8 +51,8 @@ pub type Argument =
 
 pub type Expression {
   Binary(left: Expression, op: Operator, right: Expression)
-  Prefix(op: Operator, subject: Expression)
-  Suffix(subject: Expression, op: Operator)
+  Prefix(op: Operator, subject: Literal)
+  Suffix(subject: Literal, op: Operator)
   Call(subject: Expression, args: List(Expression))
   AnonFunction(args: List(Argument), body: Block)
   Literal(Literal)

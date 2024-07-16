@@ -1,21 +1,14 @@
 import ast
 import gleam/io
 import gleam/list
-import lib
 import token
 
 import parzerker
 
 pub fn parsing_test() {
-  [
-    [token.Number(10)],
-    [token.String("bang!")],
-    [token.Tru],
-    [token.Fals],
-    [token.Identifier("variable")],
-  ]
-  |> { init_state_token |> lib.vectorize() }
-  |> { e_literal |> lib.vectorize() }
+  [token.Leftparen, token.Minus, token.Number(100), token.Rightparen]
+  |> { init_state_token }
+  |> { e_decl }
   |> io.debug()
 }
 
@@ -86,22 +79,59 @@ pub fn e_bool(state) {
   }
 }
 
+pub fn e_ident(state) {
+  state
+  |> parzerker.e_if(
+    fn(t) {
+      case t {
+        token.Identifier(_) -> True
+        _ -> False
+      }
+    },
+    False,
+    "Identifier",
+  )
+}
+
+pub fn e_dot(state) {
+  state
+  |> parzerker.e_if(
+    fn(t) {
+      case t {
+        token.Dot -> True
+        _ -> False
+      }
+    },
+    False,
+    "Dot",
+  )
+}
+
+fn climb_ref_rec(prev, rest) {
+  case rest {
+    [head, ..tail] -> climb_ref_rec(ast.Indirect(head, prev), tail)
+    [] -> prev
+  }
+}
+
 pub fn e_ref(state) {
   state
   |> {
-    parzerker.e_if(
-      fn(t) {
-        case t {
-          token.Identifier(_) -> True
-          _ -> False
-        }
-      },
-      False,
-      "Identifier",
+    e_ident
+    |> parzerker.e_seq(
+      { e_dot |> parzerker.e_seq_r(e_ident) } |> parzerker.e_cont0,
+      fn(head, tail) { [head, ..tail] },
     )
-    |> parzerker.e_map(fn(t) {
-      let assert token.Identifier(id) = t
-      ast.Reference(id)
+    |> parzerker.e_map(fn(ids) {
+      let assert [direct, ..rest] = ids
+      let rest =
+        rest
+        |> list.map(fn(t) {
+          let assert token.Identifier(str) = t
+          str
+        })
+      let assert token.Identifier(str) = direct
+      climb_ref_rec(ast.Direct(str), rest) |> ast.Reference
     })
   }
 }
@@ -114,7 +144,13 @@ pub fn e_literal(state) {
     |> parzerker.e_or(e_bool, list.append)
     |> parzerker.e_or(e_ref, list.append)
     |> parzerker.e_or(
-      { parzerker.e_surr(e_lparen, e_expr, e_rparen) },
+      {
+        parzerker.e_surr(
+          e_lparen,
+          { e_expr |> parzerker.e_map(fn(expr) { ast.ParenExpression(expr) }) },
+          e_rparen,
+        )
+      },
       list.append,
     )
   }
@@ -131,7 +167,7 @@ pub fn e_lparen(state) {
         }
       },
       False,
-      "Identifier",
+      "(",
     )
     |> parzerker.e_map(fn(_) { token.Leftparen })
   }
@@ -148,12 +184,165 @@ pub fn e_rparen(state) {
         }
       },
       False,
-      "Identifier",
+      ")",
     )
     |> parzerker.e_map(fn(_) { token.Rightparen })
   }
 }
 
 pub fn e_expr(state) {
-  todo
+  state
+  |> {
+    e_suffix
+    |> parzerker.e_or(e_prefix, list.append)
+    |> parzerker.e_or(
+      { e_literal |> parzerker.e_map(fn(lit) { ast.Literal(lit) }) },
+      list.append,
+    )
+  }
+}
+
+pub fn e_stmt(state) {
+  e_expr(state)
+}
+
+pub fn e_decl(state) {
+  e_stmt(state)
+}
+
+pub fn e_plus(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Plus -> True
+          _ -> False
+        }
+      },
+      False,
+      "+",
+    )
+    |> parzerker.e_map(fn(_) { ast.Plus })
+  }
+}
+
+pub fn e_minus(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Minus -> True
+          _ -> False
+        }
+      },
+      False,
+      "-",
+    )
+    |> parzerker.e_map(fn(_) { ast.Minus })
+  }
+}
+
+pub fn e_and(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.And -> True
+          _ -> False
+        }
+      },
+      False,
+      "&",
+    )
+    |> parzerker.e_map(fn(_) { ast.And })
+  }
+}
+
+pub fn e_bang(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Bang -> True
+          _ -> False
+        }
+      },
+      False,
+      "!",
+    )
+    |> parzerker.e_map(fn(_) { ast.Bang })
+  }
+}
+
+pub fn e_tilde(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Tilde -> True
+          _ -> False
+        }
+      },
+      False,
+      "~",
+    )
+    |> parzerker.e_map(fn(_) { ast.Tilde })
+  }
+}
+
+pub fn e_op_or(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Or -> True
+          _ -> False
+        }
+      },
+      False,
+      "|",
+    )
+    |> parzerker.e_map(fn(_) { ast.Or })
+  }
+}
+
+pub fn e_operator(state) {
+  state
+  |> {
+    e_plus
+    |> parzerker.e_or(e_minus, list.append)
+    |> parzerker.e_or(e_and, list.append)
+    |> parzerker.e_or(e_op_or, list.append)
+  }
+}
+
+pub fn e_unary(state) {
+  state
+  |> {
+    e_minus
+    |> parzerker.e_or(e_bang, list.append)
+    |> parzerker.e_or(e_tilde, list.append)
+  }
+}
+
+pub fn e_suffix(state) {
+  state
+  |> {
+    e_literal
+    |> parzerker.e_seq(e_unary, fn(lit, op) { ast.Suffix(lit, op) })
+  }
+}
+
+pub fn e_prefix(state) {
+  state
+  |> {
+    e_unary
+    |> parzerker.e_seq(e_literal, fn(op, lit) { ast.Prefix(op, lit) })
+  }
 }

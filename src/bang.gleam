@@ -11,8 +11,7 @@ import token
 pub fn main() {
   lexing.lexing_test()
   parsing.parsing_test()
-
-  startup()
+  //startup()
 }
 
 pub fn startup() {
