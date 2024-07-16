@@ -76,23 +76,21 @@ fn interpret2(str) {
   let out = {
     let state = str |> lexing.init_state_str()
 
-    use succ <- on_success(lexing.lex(state))
-    let assert parzerker.ESuccess(_, lexed) = succ
+    use _, lexed <- on_success(lexing.lex(state))
 
     io.println("Successfully tokenized input:")
     lexed |> token.repr_tokens() |> io.println()
 
     let state = lexed |> parsing.init_state_token()
 
-    use succ <- on_success(parsing.e_file(state))
-    let assert parzerker.ESuccess(_, parsed) = succ
+    use new, parsed <- on_success(parsing.e_file(state))
 
     io.println("Successfully parsed tokens:")
     io.debug(parsed)
 
-    succ
+    parzerker.ESuccess(new, parsed)
   }
-  case out {
+  case { out } {
     parzerker.ESuccess(_, _) -> Nil
     parzerker.EFailure(_, errors, fatal) ->
       lib.error_str(errors, fatal) |> io.println()
@@ -101,7 +99,7 @@ fn interpret2(str) {
 
 fn on_success(res, func) {
   case res {
-    parzerker.ESuccess(_, _) as s -> func(s)
+    parzerker.ESuccess(new, parsed) -> func(new, parsed)
     parzerker.EFailure(tally, error, fatal) ->
       parzerker.EFailure(tally, error, fatal)
   }

@@ -196,15 +196,17 @@ pub fn e_rparen(state) {
   }
 }
 
+pub fn e_lit_expr(state) {
+  state
+  |> { e_literal |> parzerker.e_map(fn(lit) { ast.Literal(lit) }) }
+}
+
 pub fn e_expr(state) {
   state
   |> {
     e_suffix
     |> parzerker.e_or(e_prefix, list.append)
-    |> parzerker.e_or(
-      { e_literal |> parzerker.e_map(fn(lit) { ast.Literal(lit) }) },
-      list.append,
-    )
+    |> parzerker.e_or(e_lit_expr, list.append)
   }
 }
 
