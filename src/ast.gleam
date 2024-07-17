@@ -11,9 +11,10 @@ pub type Operator {
   Dot
   And
   Or
+  IsEqual
+  IsNotEqual
   Less
   Greater
-  IsEqual
   GreaterEquals
   LessEquals
   LeftShift
@@ -46,17 +47,16 @@ pub type Type {
   Just(Primitive)
 }
 
-pub type Argument =
+pub type Parameter =
   #(String, Type)
 
 pub type Expression {
   Binary(left: Expression, op: Operator, right: Expression)
-  Prefix(op: Operator, subject: Literal)
-  Suffix(subject: Literal, op: Operator)
+  Prefix(op: Operator, subject: Expression)
+  Suffix(subject: Expression, op: Operator)
   Call(subject: Expression, args: List(Expression))
-  AnonFunction(args: List(Argument), body: Block)
+  AnonFunction(args: List(Parameter), body: Block)
   Literal(Literal)
-  MemberAccess(subject: Literal, member: String)
 }
 
 pub type Statement {
@@ -73,7 +73,7 @@ pub type Declaration {
   Value(name: String, value: Expression)
   Variable(name: String, value: option.Option(Expression))
   Type(name: String, definition: Expression)
-  Function(name: String, args: List(Argument), body: Block)
+  Function(name: String, args: List(Parameter), body: Block)
 }
 
 pub type Block =

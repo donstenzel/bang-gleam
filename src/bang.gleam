@@ -1,6 +1,7 @@
 import argv
 import gleam/erlang.{get_line as input}
 import gleam/io
+import gleam/string
 import lexing
 import lib
 import parsing
@@ -18,7 +19,9 @@ pub fn startup() {
   case argv.load().arguments {
     [] -> {
       io.print(
-        "Welcome to the bang! interactive environment. for now only tokenizes your input\n\n",
+        "Welcome to the bang! interactive environment.\n"
+        <> "tokenizes and parses input.\n"
+        <> "enter · to exit.\n\n",
       )
       repl()
     }
@@ -40,10 +43,21 @@ pub fn startup() {
 
 pub fn repl() {
   case input("!> ") {
-    Ok(str) -> interpret2(str)
-    Error(_) -> io.println("Couldn't get line.")
+    Ok(str) -> {
+      let assert Ok(#(grapheme, _)) = string.pop_grapheme(str)
+      case grapheme {
+        "·" -> io.println("Goodbye!")
+        _ -> {
+          interpret2(str)
+          repl()
+        }
+      }
+    }
+    Error(_) -> {
+      io.println("Couldn't get line.")
+      repl()
+    }
   }
-  repl()
 }
 
 fn interpret(str: String) {

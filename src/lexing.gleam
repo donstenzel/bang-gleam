@@ -161,7 +161,8 @@ pub fn lex(
     e_if(fn(c) { c != "'" }, False, "not '")
     |> e_cont0()
   let e_str =
-    e_surr(e_quote, e_strcntnt, e_quote)
+    e_strcntnt
+    |> e_surr(e_quote, e_quote)
     |> e_map(fn(chrs) {
       chrs
       |> collapse_lr()

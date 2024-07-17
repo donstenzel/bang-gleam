@@ -69,8 +69,8 @@ pub fn e_seq_r(
 }
 
 pub fn e_surr(
-  l: EFunction(i, _, e),
   e: EFunction(i, s, e),
+  l: EFunction(i, _, e),
   r: EFunction(i, _, e),
 ) -> EFunction(i, s, e) {
   e_seq_r(l, e_seq_l(e, r))
@@ -268,6 +268,30 @@ pub fn e_if(
             )
         }
       [] -> EFailure(tally, ["No input left to match."], True)
+    }
+  }
+}
+
+pub fn e_sep_by0(e1: EFunction(i, s, e), e2: EFunction(i, _, e)) {
+  fn(state) {
+    state
+    |> {
+      e1
+      |> e_seq({ e2 |> e_seq_r(e1) |> e_cont0() }, fn(head, tail) {
+        [head, ..tail]
+      })
+    }
+  }
+}
+
+pub fn e_sep_by1(e1: EFunction(i, s, e), e2: EFunction(i, _, e)) {
+  fn(state) {
+    state
+    |> {
+      e1
+      |> e_seq({ e2 |> e_seq_r(e1) |> e_cont1() }, fn(head, tail) {
+        [head, ..tail]
+      })
     }
   }
 }
