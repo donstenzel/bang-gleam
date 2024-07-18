@@ -7,20 +7,16 @@ import parzerker
 
 pub fn parsing_test() {
   [
-    token.Number(100),
-    token.Star,
-    token.Number(100),
-    token.Minus,
-    token.Number(100),
-    token.Leftshift,
-    token.Number(1),
-    token.Greater,
-    token.Number(1000),
-    token.Notequals,
-    token.Number(100_000),
+    token.Leftparen,
+    token.Identifier("test"),
+    token.Colon,
+    token.Identifier("String"),
+    token.Rightparen,
+    token.Bind,
+    token.Number(10),
   ]
   |> { init_state_token }
-  |> { precedence_6 }
+  |> { e_anon_func }
   |> io.debug()
 }
 
@@ -214,11 +210,17 @@ pub fn e_expr(state) {
     // |> parzerker.e_or(e_lit_expr, list.append)
     e_lit_expr
     |> parzerker.e_or(e_callchain, list.append)
+    |> parzerker.e_or(precedence_6, list.append)
+    |> parzerker.e_or(e_anon_func, list.append)
   }
 }
 
 pub fn e_stmt(state) {
-  e_expr(state)
+  state
+  |> {
+    e_expr
+    |> parzerker.e_map(fn(expr) { ast.Expression(expr) })
+  }
 }
 
 pub fn e_decl(state) {
@@ -395,6 +397,40 @@ pub fn e_tilde(state) {
   }
 }
 
+pub fn e_colon(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Colon -> True
+          _ -> False
+        }
+      },
+      False,
+      ":",
+    )
+    |> parzerker.e_map(fn(_) { token.Colon })
+  }
+}
+
+pub fn e_bind(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.Bind -> True
+          _ -> False
+        }
+      },
+      False,
+      "->",
+    )
+    |> parzerker.e_map(fn(_) { token.Bind })
+  }
+}
+
 pub fn e_gt(state) {
   state
   |> {
@@ -541,7 +577,7 @@ pub fn e_comma(state) {
 
 pub fn e_comma_sep_exprs(state) {
   state
-  |> { e_expr |> parzerker.e_sep_by0(e_comma) }
+  |> { e_expr |> parzerker.e_sep_by0(e_comma) |> parzerker.e_opt([]) }
 }
 
 fn calls(prev, rest) {
@@ -563,7 +599,7 @@ pub fn e_callchain(state) {
   }
 }
 
-// could abstract precedence levels, but i want everything as top level named functions.
+// could abstract precedence levels
 pub fn precedence_0(state) {
   state
   |> {
@@ -657,6 +693,37 @@ pub fn precedence_6(state) {
       list.append,
     )
     |> parzerker.e_or(precedence_5, list.append)
+  }
+}
+
+pub fn e_param(state) {
+  state
+  |> {
+    e_ident
+    |> parzerker.e_seq({ e_colon |> parzerker.e_seq_r(e_ref) }, fn(l, r) {
+      let assert token.Identifier(name) = l
+      let assert ast.Reference(ref) = r
+      #(name, ref)
+    })
+  }
+}
+
+pub fn e_params(state) {
+  state
+  |> {
+    e_param
+    |> parzerker.e_sep_by0(e_comma)
+    |> parzerker.e_opt([])
+    |> parzerker.e_surr(e_lparen, e_rparen)
+  }
+}
+
+pub fn e_anon_func(state) {
+  state
+  |> {
+    e_params
+    |> parzerker.e_seq_l(e_bind)
+    |> parzerker.e_seq(e_stmt, fn(l, r) { ast.AnonFunction(l, r) })
   }
 }
 

@@ -48,14 +48,14 @@ pub type Type {
 }
 
 pub type Parameter =
-  #(String, Type)
+  #(String, Reference)
 
 pub type Expression {
   Binary(left: Expression, op: Operator, right: Expression)
   Prefix(op: Operator, subject: Expression)
   Suffix(subject: Expression, op: Operator)
   Call(subject: Expression, args: List(Expression))
-  AnonFunction(args: List(Parameter), body: Block)
+  AnonFunction(args: List(Parameter), body: Statement)
   Literal(Literal)
 }
 

@@ -11,7 +11,6 @@ import simplifile
 import token
 
 pub fn main() {
-  lexing.lexing_test()
   parsing.parsing_test()
   startup()
 }
@@ -25,9 +24,7 @@ pub fn startup() {
     [] -> {
       io.print(
         "Welcome to the "
-        <> color_bang()
-        <> "bang!"
-        <> color.off
+        <> "bang!" |> color.colored(color_bang())
         <> " interactive environment.\n"
         <> "tokenizes and parses input.\n"
         <> "enter · to exit.\n\n",
@@ -39,23 +36,22 @@ pub fn startup() {
         Ok(source) -> interpret(source)
         Error(e) ->
           {
-            color.error()
-            <> "Could not read file: "
+            "Could not read file: "
             <> path
             <> "\n"
             <> simplifile.describe_error(e)
-            <> color.off
           }
+          |> color.colored(color.error())
           |> io.println()
       }
     _ ->
-      io.println(
-        color.error()
-        <> "Invalid invocation."
+      {
+        "Invalid invocation."
         <> color.hint()
         <> "Usage:\n - './bang' -> repl\n - './bang <path>' -> file"
-        <> color.off,
-      )
+      }
+      |> color.colored(color.error())
+      |> io.println()
   }
 }
 

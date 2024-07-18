@@ -40,6 +40,10 @@ pub fn get_rgb_code(red: Int, green: Int, blue: Int) {
   )
 }
 
+pub fn colored(str, color) {
+  color <> str <> off
+}
+
 pub fn get_rgb_code_clamped(red, green, blue) {
   let assert Ok(str) =
     get_rgb_code(
