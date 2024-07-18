@@ -1,3 +1,4 @@
+import color
 import gleam/int
 import gleam/list
 import gleam/string
@@ -33,13 +34,14 @@ fn vectorized(f, vs) {
 
 pub fn error_str(errors, fatal) {
   let heading = case fatal {
-    True -> "A fatal error has occured:"
-    False -> "An error has occured:"
+    True -> color.error() <> "A fatal error has occured:"
+    False -> color.error() <> "An error has occured:"
   }
 
   list.fold(from: heading, over: errors, with: fn(curr, e) {
     curr <> "\n - " <> e
   })
+  <> color.off
 }
 
 pub fn collapse_lr(str: List(String)) -> String {

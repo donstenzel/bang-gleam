@@ -1,4 +1,5 @@
 import argv
+import color
 import gleam/erlang.{get_line as input}
 import gleam/io
 import gleam/string
@@ -15,11 +16,19 @@ pub fn main() {
   startup()
 }
 
+fn color_bang() {
+  color.get_rgb_code_clamped(98, 22, 234)
+}
+
 pub fn startup() {
   case argv.load().arguments {
     [] -> {
       io.print(
-        "Welcome to the bang! interactive environment.\n"
+        "Welcome to the "
+        <> color_bang()
+        <> "bang!"
+        <> color.off
+        <> " interactive environment.\n"
         <> "tokenizes and parses input.\n"
         <> "enter · to exit.\n\n",
       )
@@ -30,81 +39,62 @@ pub fn startup() {
         Ok(source) -> interpret(source)
         Error(e) ->
           {
-            "Could not read file: "
+            color.error()
+            <> "Could not read file: "
             <> path
             <> "\n"
             <> simplifile.describe_error(e)
+            <> color.off
           }
           |> io.println()
       }
-    _ -> io.println("Usage:\n - './bang' -> repl\n - './bang <path>' -> file")
+    _ ->
+      io.println(
+        color.error()
+        <> "Invalid invocation."
+        <> color.hint()
+        <> "Usage:\n - './bang' -> repl\n - './bang <path>' -> file"
+        <> color.off,
+      )
   }
 }
 
 pub fn repl() {
-  case input("!> ") {
+  case input(color_bang() <> "·!> " <> color.off) {
     Ok(str) -> {
       let assert Ok(#(grapheme, _)) = string.pop_grapheme(str)
       case grapheme {
-        "·" -> io.println("Goodbye!")
+        "·" -> io.println(color.success() <> "Goodbye!" <> color.off)
         _ -> {
-          interpret2(str)
+          interpret(str)
           repl()
         }
       }
     }
     Error(_) -> {
-      io.println("Couldn't get line.")
+      io.println(color.error() <> "Couldn't get line." <> color.off)
       repl()
     }
   }
 }
 
-fn interpret(str: String) {
-  case str |> lexing.init_state_str() |> lexing.lex() {
-    parzerker.ESuccess(_, tokens) -> {
-      io.println("Successfully tokenized input:")
-      tokens |> token.repr_tokens() |> io.println()
-
-      case
-        tokens
-        |> token.drop_ws()
-        |> parsing.init_state_token()
-        |> parsing.e_decl()
-      {
-        parzerker.ESuccess(_, decl) -> {
-          io.println("Successfully parsed tokens:")
-          decl |> io.debug()
-          Nil
-        }
-        parzerker.EFailure(_, errors, fatal) ->
-          lib.error_str(errors, fatal) |> io.println()
-      }
-    }
-    parzerker.EFailure(_, errors, fatal) ->
-      lib.error_str(errors, fatal) |> io.println()
-  }
-}
-
-fn interpret2(str) {
+fn interpret(str) {
   let out = {
     let state = str |> lexing.init_state_str()
 
     use _, lexed <- on_success(lexing.lex(state))
-
-    io.println("Successfully tokenized input:")
-    lexed |> token.repr_tokens() |> io.println()
-
+    io.println(color.success() <> "Successfully tokenized input." <> color.off)
     let state = lexed |> parsing.init_state_token()
 
     use new, parsed <- on_success(parsing.e_file(state))
 
-    io.println("Successfully parsed tokens:")
+    io.println(color.success() <> "Successfully parsed tokens:")
     io.debug(parsed)
+    io.print(color.off)
 
     parzerker.ESuccess(new, parsed)
   }
-  case { out } {
+  case out {
     parzerker.ESuccess(_, _) -> Nil
     parzerker.EFailure(_, errors, fatal) ->
       lib.error_str(errors, fatal) |> io.println()

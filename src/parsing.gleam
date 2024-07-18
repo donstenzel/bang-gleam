@@ -12,6 +12,12 @@ pub fn parsing_test() {
     token.Number(100),
     token.Minus,
     token.Number(100),
+    token.Leftshift,
+    token.Number(1),
+    token.Greater,
+    token.Number(1000),
+    token.Notequals,
+    token.Number(100_000),
   ]
   |> { init_state_token }
   |> { precedence_6 }
