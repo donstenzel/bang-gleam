@@ -11,11 +11,17 @@ import simplifile
 
 pub fn main() {
   // lexing.lexing_test()
+  // "(a) -> 10" |> lexing.init_state_str() |> lexing.lex() |> io.debug()
+  // parsing.parsing_test()
 
-  "(a)->10" |> lexing.init_state_str() |> lexing.lex() |> io.debug()
-  parsing.parsing_test()
-
-  startup()
+  color.seperated([
+    #(#(10, 40, 100), "Lex"),
+    #(#(150, 10, 60), "Parse"),
+    #(#(40, 150, 20), "Analyze"),
+    #(#(120, 40, 190), "Evaluate"),
+  ])
+  |> io.println()
+  // startup()
 }
 
 fn color_bang() {

@@ -34,8 +34,8 @@ fn vectorized(f, vs) {
 
 pub fn error_str(errors, fatal) {
   let heading = case fatal {
-    True -> color.error() <> "A fatal error has occured:"
-    False -> color.error() <> "An error has occured:"
+    True -> "A fatal error has occured:"
+    False -> "An error has occured:"
   }
 
   let errors = errors |> list.unique()
@@ -43,7 +43,7 @@ pub fn error_str(errors, fatal) {
   list.fold(from: heading, over: errors, with: fn(curr, e) {
     curr <> "\n - " <> e
   })
-  <> color.off
+  |> color.colored(color.error())
 }
 
 pub fn collapse_lr(str: List(String)) -> String {
