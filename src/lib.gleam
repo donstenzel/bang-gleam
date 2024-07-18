@@ -38,6 +38,8 @@ pub fn error_str(errors, fatal) {
     False -> color.error() <> "An error has occured:"
   }
 
+  let errors = errors |> list.unique()
+
   list.fold(from: heading, over: errors, with: fn(curr, e) {
     curr <> "\n - " <> e
   })

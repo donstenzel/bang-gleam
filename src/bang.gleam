@@ -8,10 +8,13 @@ import lib
 import parsing
 import parzerker
 import simplifile
-import token
 
 pub fn main() {
+  // lexing.lexing_test()
+
+  "(a)->10" |> lexing.init_state_str() |> lexing.lex() |> io.debug()
   parsing.parsing_test()
+
   startup()
 }
 
@@ -80,7 +83,8 @@ fn interpret(str) {
 
     use _, lexed <- on_success(lexing.lex(state))
     io.println(color.success() <> "Successfully tokenized input." <> color.off)
-    let state = lexed |> parsing.init_state_token()
+    let state =
+      lexed |> lexing.drop_ws() |> parsing.init_state_token() |> io.debug()
 
     use new, parsed <- on_success(parsing.e_file(state))
 

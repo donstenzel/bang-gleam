@@ -16,7 +16,7 @@ pub fn parsing_test() {
     token.Number(10),
   ]
   |> { init_state_token }
-  |> { e_anon_func }
+  |> { e_file }
   |> io.debug()
 }
 
@@ -208,10 +208,8 @@ pub fn e_expr(state) {
     // e_suffix
     // |> parzerker.e_or(e_prefix, list.append)
     // |> parzerker.e_or(e_lit_expr, list.append)
-    e_lit_expr
-    |> parzerker.e_or(e_callchain, list.append)
+    e_anon_func
     |> parzerker.e_or(precedence_6, list.append)
-    |> parzerker.e_or(e_anon_func, list.append)
   }
 }
 
@@ -224,7 +222,7 @@ pub fn e_stmt(state) {
 }
 
 pub fn e_decl(state) {
-  e_stmt(state)
+  state |> e_stmt()
 }
 
 pub fn e_mult(state) {
@@ -727,7 +725,25 @@ pub fn e_anon_func(state) {
   }
 }
 
+pub fn e_end(state) {
+  state
+  |> {
+    parzerker.e_if(
+      fn(t) {
+        case t {
+          token.END -> True
+          _ -> False
+        }
+      },
+      False,
+      "End of File",
+    )
+    |> parzerker.e_map(fn(_) { token.END })
+  }
+}
+
 pub fn e_file(state) {
   state
-  |> { e_decl |> parzerker.e_cont1 }
+  |> { e_decl |> parzerker.e_cont1() }
+  // |> parzerker.e_seq_l(e_end)
 }

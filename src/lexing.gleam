@@ -20,6 +20,16 @@ pub fn init_state_str(str) {
   parzerker.EState(string.to_graphemes(str), 0)
 }
 
+pub fn drop_ws(tokens: List(token.Token)) {
+  tokens
+  |> list.filter(fn(t) {
+    case t {
+      token.Whitespace(_) -> False
+      _ -> True
+    }
+  })
+}
+
 pub fn e_char(
   char: String,
   fatal: Bool,
@@ -214,6 +224,14 @@ pub fn lex(
     e_this,
     e_enum,
     e_struct,
+    e_dequal,
+    e_lteq,
+    e_gteq,
+    e_nequal,
+    e_lshift,
+    e_rshift,
+    e_pipe,
+    e_bind,
     e_lparen,
     e_rparen,
     e_lbrckt,
@@ -236,14 +254,6 @@ pub fn lex(
     e_comma,
     e_colon,
     e_tilde,
-    e_dequal,
-    e_lteq,
-    e_gteq,
-    e_nequal,
-    e_lshift,
-    e_rshift,
-    e_pipe,
-    e_bind,
     e_var,
     e_val,
     e_fun,

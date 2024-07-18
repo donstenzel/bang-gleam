@@ -96,32 +96,52 @@ pub fn e_or(
   combine_errors: fn(e, e) -> e,
 ) -> EFunction(i, s, e) {
   fn(state: State(i)) -> EResult(i, s, e) {
-    case e1(state), e2(state) {
-      ESuccess(EState(_, tally1), _) as s1, ESuccess(EState(_, tally2), _) as s2
-      -> {
-        case int.compare(tally1, tally2) {
-          order.Lt -> s2
-          order.Eq
-          | // <- maybe return error because of ambiguous match
-            order.Gt -> s1
-        }
-      }
-
-      EFailure(_, _, _), ESuccess(_, _) as s
-      | ESuccess(_, _) as s, EFailure(_, _, _)
-      -> s
-
-      EFailure(tally1, error1, fatal1) as f1,
-        EFailure(tally2, error2, fatal2) as f2
-      -> {
-        case int.compare(tally1, tally2) {
-          order.Lt -> f2
-          order.Gt -> f1
-          order.Eq ->
-            EFailure(tally1, combine_errors(error1, error2), fatal1 || fatal2)
+    case e1(state) {
+      ESuccess(_, _) as s -> s
+      EFailure(tally1, error1, fatal1) as f1 -> {
+        case e2(state) {
+          ESuccess(_, _) as s -> s
+          EFailure(tally2, error2, fatal2) as f2 -> {
+            case int.compare(tally1, tally2) {
+              order.Lt -> f2
+              order.Gt -> f1
+              order.Eq ->
+                EFailure(
+                  tally1,
+                  combine_errors(error1, error2),
+                  fatal1 || fatal2,
+                )
+            }
+          }
         }
       }
     }
+    // case e1(state), e2(state) {
+    //   ESuccess(EState(_, tally1), _) as s1, ESuccess(EState(_, tally2), _) as s2
+    //   -> {
+    //     case int.compare(tally1, tally2) {
+    //       order.Lt -> s2
+    //       order.Eq
+    //       | // <- maybe return error because of ambiguous match
+    //         order.Gt -> s1
+    //     }
+    //   }
+
+    //   EFailure(_, _, _), ESuccess(_, _) as s
+    //   | ESuccess(_, _) as s, EFailure(_, _, _)
+    //   -> s
+
+    //   EFailure(tally1, error1, fatal1) as f1,
+    //     EFailure(tally2, error2, fatal2) as f2
+    //   -> {
+    //     case int.compare(tally1, tally2) {
+    //       order.Lt -> f2
+    //       order.Gt -> f1
+    //       order.Eq ->
+    //         EFailure(tally1, combine_errors(error1, error2), fatal1 || fatal2)
+    //     }
+    //   }
+    // }
   }
 }
 
