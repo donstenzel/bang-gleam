@@ -16,7 +16,7 @@ pub const default_foreground = "\u{001b}[39m"
 
 pub const default_background = "\u{001b}[49m"
 
-pub fn seperated(colored_segments: List(#(#(Int, Int, Int), String))) -> String {
+pub fn segmented(colored_segments: List(#(#(Int, Int, Int), String))) -> String {
   // color1 <> element1 <> seperator(color1, color2) <> color2 <> ...
   case colored_segments {
     [head, ..tail] -> {

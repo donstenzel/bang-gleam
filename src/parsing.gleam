@@ -9,14 +9,14 @@ pub fn parsing_test() {
   [
     token.Leftparen,
     token.Identifier("test"),
-    token.Colon,
-    token.Identifier("String"),
+    // token.Colon,
+    // token.Identifier("String"),
     token.Rightparen,
-    token.Bind,
-    token.Number(10),
+    // token.Bind,
+  // token.Number(10),
   ]
   |> { init_state_token }
-  |> { e_file }
+  |> { e_expr }
   |> io.debug()
 }
 

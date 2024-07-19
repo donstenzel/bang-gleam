@@ -10,18 +10,18 @@ import parzerker
 import simplifile
 
 pub fn main() {
-  // lexing.lexing_test()
-  // "(a) -> 10" |> lexing.init_state_str() |> lexing.lex() |> io.debug()
-  // parsing.parsing_test()
-
-  color.seperated([
-    #(#(10, 40, 100), "Lex"),
-    #(#(150, 10, 60), "Parse"),
-    #(#(40, 150, 20), "Analyze"),
-    #(#(120, 40, 190), "Evaluate"),
+  color.segmented([
+    #(#(10, 40, 100), "Lex ✔"),
+    #(#(150, 10, 60), "Parse ✔"),
+    #(#(40, 150, 20), "Analyze 🗴"),
+    #(#(120, 40, 190), "Evaluate 🗴"),
   ])
   |> io.println()
-  // startup()
+  // lexing.lexing_test()
+  // parsing.parsing_test()
+  // this is incredibly slow at the moment... the precedence levels introduce
+  // exponentially increasing times. we need an all in one solution for it
+  startup()
 }
 
 fn color_bang() {
@@ -35,7 +35,6 @@ pub fn startup() {
         "Welcome to the "
         <> "bang!" |> color.colored(color_bang())
         <> " interactive environment.\n"
-        <> "tokenizes and parses input.\n"
         <> "enter · to exit.\n\n",
       )
       repl()
